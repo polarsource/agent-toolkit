@@ -21,7 +21,7 @@ Both servers use OAuth. Nothing connects until you sign in to Polar and authoriz
 | --- | --- |
 | `setup-polar` | Guided setup from scratch: connects the MCP server, creates an organization and a first product, then hands off to `polar-integration`. |
 | `polar-integration` | Adds Checkout, Customer Portal and Webhooks endpoints with `@polar-sh/sdk` to any TS/JS framework, including Next.js, Express, Hono, Astro, SvelteKit, Remix, Nuxt and Cloudflare Workers. |
-| `polar-testing` | Tests an integration against the sandbox: test cards, local webhooks with the Polar CLI (`polar listen`, `polar trigger`), mocks and CI. |
+| `polar-testing` | Tests an integration against the sandbox: test cards, local webhooks with the Polar CLI (`polar webhook listen`, `polar webhook trigger`), mocks and CI. |
 | `polar-migration` | Plans and runs a migration from Stripe Billing, Paddle, Lemon Squeezy or Gumroad. |
 
 ## Installation

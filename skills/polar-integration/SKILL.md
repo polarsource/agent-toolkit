@@ -377,11 +377,11 @@ export async function POST(request: Request): Promise<Response> {
 With the dev server running, forward events with the Polar CLI and send one (setup in `polar-testing`, "Local Webhook Testing"):
 
 ```bash
-polar listen 3000/api/polar/webhook   # keep it running in the background
-polar trigger order.paid              # exits 1 and prints the response when the handler fails
+polar webhook listen 3000/api/polar/webhook   # keep it running in the background
+polar webhook trigger order.paid              # exits 1 and prints the response when the handler fails
 ```
 
-Locally, `POLAR_WEBHOOK_SECRET` is the secret from `polar listen --print-secret`.
+Locally, `POLAR_WEBHOOK_SECRET` is the secret from `polar webhook listen --print-secret`.
 
 ### Framework variations
 
