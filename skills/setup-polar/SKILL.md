@@ -112,10 +112,10 @@ Use the Polar CLI to forward webhooks to the local dev server. It needs no tunne
 1. Install the CLI (`npm install -g @polar-sh/cli`) and ask the user to run `polar auth login --sandbox`, which opens a browser.
 2. Save the local signing secret without printing it, then restart the dev server:
    ```bash
-   secret=$(polar listen --print-secret) && echo "POLAR_WEBHOOK_SECRET=$secret" >> .env
+   secret=$(polar webhook listen --print-secret) && echo "POLAR_WEBHOOK_SECRET=$secret" >> .env
    ```
-3. Start `polar listen <port>/<webhook-path>` in the background, using the path from the route generated in Step 6, and keep it running.
-4. Run `polar trigger order.paid`. It prints the handler's response and exits with status 1 when the handler fails. Fix the handler and repeat until it exits with 0.
+3. Start `polar webhook listen <port>/<webhook-path>` in the background, using the path from the route generated in Step 6, and keep it running.
+4. Run `polar webhook trigger order.paid`. It prints the handler's response and exits with status 1 when the handler fails. Fix the handler and repeat until it exits with 0.
 
 When deploying, create a webhook endpoint for the public URL with MCP or in the dashboard (Settings → Webhooks), select `order.paid`, `subscription.created` and `subscription.canceled`, and use that endpoint's secret as `POLAR_WEBHOOK_SECRET` in the deployed environment.
 
@@ -124,7 +124,7 @@ When deploying, create a webhook endpoint for the public URL with MCP or in the 
 1. Start the dev server.
 2. Visit the checkout URL with the product ID from Step 5 (path and query shape come from the route generated in Step 6).
 3. Complete checkout using test card: `4242 4242 4242 4242`.
-4. Verify that `polar listen` shows `order.paid` with a 2xx status from the handler.
+4. Verify that `polar webhook listen` shows `order.paid` with a 2xx status from the handler.
 5. Check the success page displays correctly.
 
 ### Step 9: Next Steps
