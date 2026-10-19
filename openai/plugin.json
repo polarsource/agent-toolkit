@@ -1,0 +1,102 @@
+{
+  "name": "polar",
+  "version": "0.1.0",
+  "description": "Add Polar payments, subscriptions and usage billing to your app. Connects to your Polar organization and adds skills for setup, integration, testing and migrating from other payment platforms.",
+  "author": {
+    "name": "Polar",
+    "url": "https://polar.sh"
+  },
+  "homepage": "https://polar.sh",
+  "repository": "https://github.com/polarsource/agent-toolkit",
+  "license": "MIT",
+  "keywords": ["polar", "payments", "billing", "subscriptions", "checkout", "webhooks"],
+  "skills": "./skills/",
+  "mcpServers": "./.mcp.json",
+  "interface": {
+    "displayName": "Polar",
+    "shortDescription": "Payments and billing for apps",
+    "longDescription": "Polar is open-source payment infrastructure for developers. Connect your Polar organization to look up products, customers, orders, subscriptions and revenue, and to create products and discounts, without leaving your conversation.\n\nThe included skills guide you from a fresh project to working payments: creating your organization and first product, adding Checkout, Customer Portal and Webhooks endpoints with the Polar SDK in any TypeScript or JavaScript framework, testing against the Polar sandbox with the Polar CLI, and migrating from Stripe Billing, Paddle or Lemon Squeezy.",
+    "developerName": "Polar Software Inc.",
+    "category": "Developer Tools",
+    "capabilities": [
+      "Look up products, customers, orders and subscriptions",
+      "Report revenue and other metrics",
+      "Create and update products and discounts",
+      "Search the Polar documentation",
+      "Add Polar checkout, customer portal and webhooks to an app"
+    ],
+    "websiteURL": "https://polar.sh",
+    "supportURL": "https://polar.sh/docs/support",
+    "privacyPolicyURL": "https://polar.sh/legal/privacy-policy",
+    "termsOfServiceURL": "https://polar.sh/legal/master-services-terms",
+    "defaultPrompt": [
+      "Help me add Polar payments to my Next.js app",
+      "How much revenue did my Polar store make this month?",
+      "Show my five most recent Polar orders"
+    ],
+    "brandColor": "#000000",
+    "brandColorDark": "#FFFFFF",
+    "composerIcon": "./assets/polar_logomark_black.png",
+    "logo": "./assets/polar_logomark_black.png"
+  },
+  "extensions": {
+    "com.openai": {
+      "onboardingSkill": "./skills/setup-polar/SKILL.md",
+      "review": {
+        "test_cases": {
+          "positive": [
+            {
+              "description": "Lists the organization's products",
+              "prompt": "What products am I selling on Polar right now, and what do they cost?",
+              "tools_triggered": "products_list",
+              "expected_behavior": "Lists the organization's products with each product's name, billing type and price."
+            },
+            {
+              "description": "Reports revenue for a time period",
+              "prompt": "How much revenue did my Polar store make in the last 30 days?",
+              "tools_triggered": "metrics_get",
+              "expected_behavior": "Fetches metrics for the last 30 days and reports total revenue and the number of orders."
+            },
+            {
+              "description": "Lists recent orders",
+              "prompt": "Show my five most recent Polar orders and who placed them.",
+              "tools_triggered": "orders_list",
+              "expected_behavior": "Lists the five most recent orders with the customer, product, amount and date of each."
+            },
+            {
+              "description": "Creates a discount code",
+              "prompt": "Create a 20% off discount code LAUNCH20 on Polar that applies to all my products.",
+              "tools_triggered": "discounts_create",
+              "expected_behavior": "Creates a 20% percentage discount with the code LAUNCH20 and confirms its name, code and amount."
+            },
+            {
+              "description": "Answers an integration question from the Polar docs",
+              "prompt": "How do I verify Polar webhook signatures in a Node.js app?",
+              "tools_triggered": "search_docs, read_docs_page",
+              "expected_behavior": "Searches the Polar documentation and explains how to validate webhook signatures with the Polar SDK, citing the docs page."
+            }
+          ],
+          "negative": [
+            {
+              "description": "Unrelated weather question",
+              "prompt": "What will the weather be like in Stockholm tomorrow?"
+            },
+            {
+              "description": "General coding task unrelated to payments",
+              "prompt": "Write a Python function that checks whether a string is a palindrome."
+            },
+            {
+              "description": "Unrelated booking request",
+              "prompt": "Book a table for two at an Italian restaurant tonight."
+            }
+          ]
+        },
+        "commerce": false
+      },
+      "publication": {
+        "countries": [],
+        "release_notes": "First release of the Polar plugin: the Polar MCP server and skills for setup, integration, testing and migration."
+      }
+    }
+  }
+}

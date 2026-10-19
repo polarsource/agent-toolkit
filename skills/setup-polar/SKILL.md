@@ -22,7 +22,7 @@ First, check if the Polar MCP server is available. Try listing products or organ
 
 ### Step 2: Install Polar MCP
 
-**Polar plugin for Claude Code:** the `polar` and `polar-sandbox` servers are already configured. Ask the user to run `/mcp`, select `polar-sandbox` and sign in, then continue with the verification below.
+**Polar plugin installed:** the plugin already configures the Polar server (`polar`, plus `polar-sandbox` where available). Ask the user to sign in to it, preferring `polar-sandbox`: in Claude Code with `/mcp`, in Codex with `codex mcp login <server>`, and in ChatGPT when prompted to connect. Then continue with the verification below.
 
 Otherwise, guide the user to install the Polar MCP server based on their environment:
 
