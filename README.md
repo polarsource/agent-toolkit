@@ -65,9 +65,16 @@ Help me migrate my subscriptions from Stripe to Polar
 
 ## Data and privacy
 
-The plugin contains instructions and MCP server configuration only. It runs no scripts or hooks on your machine and sends no telemetry.
+The plugin contains instructions and MCP server configuration only. It ships no scripts or hooks and sends no telemetry itself.
 
 When you use the MCP servers, your agent sends requests to `mcp.polar.sh` over HTTPS. They read and change data in the Polar organization you authorized, such as products, customers, subscriptions and orders, within the permissions you granted. To disconnect, clear the server's authentication in `/mcp` or uninstall the plugin. Polar handles this data under its [Privacy Policy](https://polar.sh/legal/privacy-policy) and [Terms of Service](https://polar.sh/legal/master-services-terms).
+
+The skills also ask your agent to run commands and write code that talk to these services:
+
+- **Polar API** (`api.polar.sh`, `sandbox-api.polar.sh`): the integration code, tests and Polar CLI commands the skills set up call it with your own access token or CLI login.
+- **Polar CLI telemetry** (PostHog): `setup-polar` and `polar-testing` install the [Polar CLI](https://polar.sh/docs/integrate/cli/introduction), which sends one anonymous event per command, such as the command name, duration, CLI version and OS. It never sends access tokens, organization IDs, URLs or payloads. Opt out with `POLAR_CLI_TELEMETRY_OPTOUT=1`.
+- **npm registry**: to install `@polar-sh/cli` and `@polar-sh/sdk`.
+- **Your current payment provider** (Stripe, Paddle or Lemon Squeezy): `polar-migration` writes scripts that export your products, customers and subscriptions with your own API keys so they can be imported into Polar.
 
 ## Support
 
