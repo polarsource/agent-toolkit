@@ -22,22 +22,24 @@ First, check if the Polar MCP server is available. Try listing products or organ
 
 ### Step 2: Install Polar MCP
 
-Guide the user to install the Polar MCP server based on their environment:
+**Polar plugin for Claude Code:** the `polar` and `polar-sandbox` servers are already configured. Ask the user to run `/mcp`, select `polar-sandbox` and sign in, then continue with the verification below.
+
+Otherwise, guide the user to install the Polar MCP server based on their environment:
 
 **Claude Code:**
 ```bash
 # Production
-claude mcp add --transport http "Polar" "https://mcp.polar.sh/mcp/polar-mcp"
+claude mcp add --transport http polar https://mcp.polar.sh/mcp/polar-mcp
 
 # Sandbox (recommended for setup)
-claude mcp add --transport http "Polar Sandbox" "https://mcp.polar.sh/mcp/polar-sandbox"
+claude mcp add --transport http polar-sandbox https://mcp.polar.sh/mcp/polar-sandbox
 ```
 
 **Cursor** (`.cursor/mcp.json`):
 ```json
 {
   "mcpServers": {
-    "Polar Sandbox": {
+    "polar-sandbox": {
       "url": "https://mcp.polar.sh/mcp/polar-sandbox"
     }
   }

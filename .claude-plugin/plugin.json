@@ -1,0 +1,19 @@
+{
+  "name": "polar",
+  "displayName": "Polar",
+  "version": "0.1.0",
+  "description": "Add Polar payments, subscriptions and usage billing to your app. Connects Claude to your Polar organization through the Polar MCP server and adds skills for setup, integration, testing and migrating from other payment platforms.",
+  "author": {
+    "name": "Polar",
+    "url": "https://polar.sh"
+  },
+  "homepage": "https://polar.sh",
+  "repository": "https://github.com/polarsource/agent-toolkit",
+  "license": "MIT",
+  "keywords": ["polar", "payments", "billing", "subscriptions", "checkout", "webhooks", "mcp"],
+  "icon": "./assets/polar_logomark_black.png",
+  "documentationUrl": "https://polar.sh/docs/integrate/mcp",
+  "supportUrl": "https://polar.sh/docs/support",
+  "privacyPolicyUrl": "https://polar.sh/legal/privacy-policy",
+  "termsOfServiceUrl": "https://polar.sh/legal/master-services-terms"
+}

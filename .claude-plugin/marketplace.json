@@ -1,0 +1,14 @@
+{
+  "name": "polar",
+  "owner": {
+    "name": "Polar",
+    "url": "https://polar.sh"
+  },
+  "description": "Polar plugins for Claude Code",
+  "plugins": [
+    {
+      "name": "polar",
+      "source": "./"
+    }
+  ]
+}

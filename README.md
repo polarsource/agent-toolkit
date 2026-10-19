@@ -1,104 +1,80 @@
-# Polar Skills
+# Polar Agent Toolkit
 
-A collection of skills for AI coding agents. Skills are packaged instructions and scripts that extend agent capabilities for working with [Polar](https://polar.sh) - the open-source payment infrastructure platform.
+Polar's plugin for AI coding agents. It connects your agent to [Polar](https://polar.sh), the open-source payment infrastructure platform, so it can set up products, checkouts, customer portals and webhooks in your app, test them against the Polar sandbox, and help you migrate from another payment provider.
 
-Skills follow the [Agent Skills](https://agentskills.io/) format.
+The skills follow the [Agent Skills](https://agentskills.io/) format, so they also work in agents that don't support plugins.
 
-## Available Skills
+## What's included
 
-### setup-polar
+### MCP servers
 
-Interactive onboarding wizard to set up Polar payments from scratch — installs the Polar MCP server, creates an organization and first product, then hands off to `polar-integration` to generate framework-specific endpoints.
+| Server | URL | Use it for |
+| --- | --- | --- |
+| `polar` | `https://mcp.polar.sh/mcp/polar-mcp` | Your live Polar organization |
+| `polar-sandbox` | `https://mcp.polar.sh/mcp/polar-sandbox` | Test data on [sandbox.polar.sh](https://sandbox.polar.sh) |
 
-**Use when:**
-- Starting fresh with Polar in a project
-- "How do I get started with Polar?"
-- Adding payments/subscriptions/checkout to an app for the first time
+Both servers use OAuth. Nothing connects until you sign in to Polar and authorize an organization.
 
-### polar-integration
+### Skills
 
-Canonical guide for wiring up Polar's three core HTTP endpoints — Checkout, Customer Portal, and Webhooks — using `@polar-sh/sdk` directly. Recipes are framework-agnostic (Web Standards `Request`/`Response`) with per-framework adjustments.
-
-**Use when:**
-- Adding a Checkout, Customer Portal, or Webhooks endpoint
-- Working in any TS/JS framework: Next.js, Express, Hono, Astro, SvelteKit, Remix, TanStack Start, Nuxt, Fastify, Elysia, Deno, Supabase Edge Functions, Cloudflare Workers, Bun
-- Verifying webhook signatures with `validateEvent`
-
-### polar-testing
-
-Guide for testing Polar payment integrations using the sandbox environment.
-
-**Use when:**
-- Setting up the Polar sandbox for development
-- Testing checkout flows without real payments
-- Using Stripe test cards with Polar
-- Writing integration tests for payment flows
-- Testing webhooks locally with the Polar CLI (`polar listen`, `polar trigger`)
-- Generating webhook fixtures for handler tests
-- Mocking Polar in unit tests
-- Setting up CI/CD pipelines
-
-### polar-migration
-
-Guide for migrating to Polar from other payment platforms.
-
-**Use when:**
-- Planning a migration from Stripe Billing, Paddle, or Lemon Squeezy
-- Migrating customer data and subscriptions
-- Running parallel systems during transition
-- Mapping products and pricing between platforms
-- Communicating migration to customers
+| Skill | What it does |
+| --- | --- |
+| `setup-polar` | Guided setup from scratch: connects the MCP server, creates an organization and a first product, then hands off to `polar-integration`. |
+| `polar-integration` | Adds Checkout, Customer Portal and Webhooks endpoints with `@polar-sh/sdk` to any TS/JS framework, including Next.js, Express, Hono, Astro, SvelteKit, Remix, Nuxt and Cloudflare Workers. |
+| `polar-testing` | Tests an integration against the sandbox: test cards, local webhooks with the Polar CLI (`polar listen`, `polar trigger`), mocks and CI. |
+| `polar-migration` | Plans and runs a migration from Stripe Billing, Paddle, Lemon Squeezy or Gumroad. |
 
 ## Installation
 
 ### Claude Code
 
-```bash
-cp -r skills/setup-polar ~/.claude/skills/
-cp -r skills/polar-integration ~/.claude/skills/
-cp -r skills/polar-testing ~/.claude/skills/
-cp -r skills/polar-migration ~/.claude/skills/
+```
+/plugin install polar --marketplace polarsource/agent-toolkit
 ```
 
-### claude.ai
+On Claude Code versions before 2.1.275, add the marketplace first:
 
-Add the skill to project knowledge or paste `SKILL.md` contents into the conversation.
+```
+/plugin marketplace add polarsource/agent-toolkit
+/plugin install polar@polar
+```
 
-## Usage
+Then run `/mcp`, select `polar` or `polar-sandbox` and sign in to Polar in your browser. Skills are available as `/polar:setup-polar`, `/polar:polar-integration` and so on, and Claude also uses them on its own when a task matches.
 
-Skills are automatically available once installed. The agent will use them when relevant tasks are detected.
+### Other agents
 
-**Examples:**
+Install the skills with [skills](https://github.com/vercel-labs/skills):
+
+```bash
+npx skills add https://github.com/polarsource/agent-toolkit
+```
+
+Then connect the MCP server by following the [Polar MCP guide](https://polar.sh/docs/integrate/mcp) for your client.
+
+## Example prompts
+
 ```
 Help me set up Polar in my Next.js app
 ```
 ```
-How do I test Polar webhooks locally?
+Add a Polar webhook handler and test it locally
 ```
 ```
-Write tests for my Polar webhook handler
-```
-```
-Help me migrate from Stripe to Polar
-```
-```
-Set up the Polar MCP server for Claude
+Help me migrate my subscriptions from Stripe to Polar
 ```
 
-## Skill Structure
+## Data and privacy
 
-Each skill contains:
-- `SKILL.md` - Instructions for the agent (required)
-- `references/` - Supporting documentation (optional)
-- `scripts/` - Executable scripts (optional)
+The plugin contains instructions and MCP server configuration only. It runs no scripts or hooks on your machine and sends no telemetry.
 
-## Resources
+When you use the MCP servers, your agent sends requests to `mcp.polar.sh` over HTTPS. They read and change data in the Polar organization you authorized, such as products, customers, subscriptions and orders, within the permissions you granted. To disconnect, clear the server's authentication in `/mcp` or uninstall the plugin. Polar handles this data under its [Privacy Policy](https://polar.sh/legal/privacy-policy) and [Terms of Service](https://polar.sh/legal/master-services-terms).
 
-- [Polar Documentation](https://polar.sh/docs)
-- [Polar GitHub](https://github.com/polarsource/polar)
-- [Polar Sandbox](https://sandbox.polar.sh)
-- [Polar MCP Integration](https://polar.sh/docs/integrate/mcp)
+## Support
+
+- [Polar documentation](https://polar.sh/docs)
+- [Contact Polar support](https://polar.sh/docs/support)
+- [Report an issue with this plugin](https://github.com/polarsource/agent-toolkit/issues)
 
 ## License
 
-MIT
+[MIT](LICENSE)
