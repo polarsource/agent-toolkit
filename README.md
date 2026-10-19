@@ -41,6 +41,15 @@ On Claude Code versions before 2.1.275, add the marketplace first:
 
 Then run `/mcp`, select `polar` or `polar-sandbox` and sign in to Polar in your browser. Skills are available as `/polar:setup-polar`, `/polar:polar-integration` and so on, and Claude also uses them on its own when a task matches.
 
+### Codex
+
+```bash
+codex plugin marketplace add polarsource/agent-toolkit
+codex plugin add polar@polar
+```
+
+Then sign in to Polar in your browser with `codex mcp login polar` or `codex mcp login polar-sandbox`. Codex uses the skills on its own when a task matches.
+
 ### Other agents
 
 Install the skills with [skills](https://github.com/vercel-labs/skills):
@@ -67,7 +76,7 @@ Help me migrate my subscriptions from Stripe to Polar
 
 The plugin contains instructions and MCP server configuration only. It ships no scripts or hooks and sends no telemetry itself.
 
-When you use the MCP servers, your agent sends requests to `mcp.polar.sh` over HTTPS. They read and change data in the Polar organization you authorized, such as products, customers, subscriptions and orders, within the permissions you granted. To disconnect, clear the server's authentication in `/mcp` or uninstall the plugin. Polar handles this data under its [Privacy Policy](https://polar.sh/legal/privacy-policy) and [Terms of Service](https://polar.sh/legal/master-services-terms).
+When you use the MCP servers, your agent sends requests to `mcp.polar.sh` over HTTPS. They read and change data in the Polar organization you authorized, such as products, customers, subscriptions and orders, within the permissions you granted. To disconnect, clear the server's authentication in `/mcp` in Claude Code, run `codex mcp logout <server>` in Codex, or uninstall the plugin. Polar handles this data under its [Privacy Policy](https://polar.sh/legal/privacy-policy) and [Terms of Service](https://polar.sh/legal/master-services-terms).
 
 The skills also ask your agent to run commands and write code that talk to these services:
 

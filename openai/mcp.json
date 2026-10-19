@@ -1,0 +1,7 @@
+{
+  "mcpServers": {
+    "polar": {
+      "url": "https://mcp.polar.sh/mcp/polar-mcp?codemode=false"
+    }
+  }
+}
