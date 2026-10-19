@@ -109,7 +109,7 @@ Pass along the product ID from Step 5 so checkout links can be tested in Step 8.
 
 Use the Polar CLI to forward webhooks to the local dev server. It needs no tunnel and no dashboard endpoint. The `polar-testing` skill ("Local Webhook Testing") has the details.
 
-1. Install the CLI (`curl -fsSL https://polar.sh/install.sh | bash`) and ask the user to run `polar auth login --sandbox`, which opens a browser.
+1. Install the CLI (`npm install -g @polar-sh/cli`) and ask the user to run `polar auth login --sandbox`, which opens a browser.
 2. Save the local signing secret without printing it, then restart the dev server:
    ```bash
    secret=$(polar listen --print-secret) && echo "POLAR_WEBHOOK_SECRET=$secret" >> .env

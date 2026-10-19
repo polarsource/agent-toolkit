@@ -102,11 +102,12 @@ Use the Polar CLI. It forwards your organization's webhook events straight to yo
 ### Install and sign in
 
 ```bash
-# macOS, Linux, WSL
-curl -fsSL https://polar.sh/install.sh | bash
+npm install -g @polar-sh/cli
 
 polar auth login --sandbox
 ```
+
+For other install methods, see the [CLI docs](https://polar.sh/docs/integrate/cli/introduction).
 
 `polar auth login` opens a browser, so ask the user to run it. Check the result with `polar auth whoami --json`: `environments` lists the signed-in environments and `organization` is the active one.
 
