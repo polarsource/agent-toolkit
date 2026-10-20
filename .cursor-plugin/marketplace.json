@@ -1,0 +1,16 @@
+{
+  "name": "polar",
+  "owner": {
+    "name": "Polar"
+  },
+  "metadata": {
+    "description": "Polar plugins for Cursor"
+  },
+  "plugins": [
+    {
+      "name": "polar",
+      "source": "./",
+      "description": "Add Polar payments, subscriptions and usage billing to your app."
+    }
+  ]
+}
