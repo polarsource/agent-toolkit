@@ -30,70 +30,41 @@ The sandbox is completely isolated from production. You need separate:
 
 ### SDK Configuration
 
-```typescript
-// TypeScript
-import { Polar } from "@polar-sh/sdk";
+Set up the client as in `polar-integration` ("Setup") and pass `environment: "sandbox"`:
 
-const polar = new Polar({
-  accessToken: process.env.POLAR_ACCESS_TOKEN,
-  server: "sandbox", // Switch to "production" for live
+```typescript
+import { createPolar } from "@polar-sh/sdk/2026-10";
+
+const polar = createPolar({
+  accessToken: process.env.POLAR_ACCESS_TOKEN!,
+  environment: "sandbox",
 });
 ```
 
 ```python
-# Python
-from polar_sdk import Polar
+import os
 
-polar = Polar(
-    access_token=os.environ["POLAR_ACCESS_TOKEN"],
-    server="sandbox",
-)
-```
+from polar.v2026_10 import Polar
 
-```go
-// Go
-s := polargo.New(
-    polargo.WithServer("sandbox"),
-    polargo.WithSecurity(os.Getenv("POLAR_ACCESS_TOKEN")),
-)
+polar = Polar(os.environ["POLAR_ACCESS_TOKEN"], environment="sandbox")
 ```
 
 ### Sandbox Limitations
 
-- Subscriptions auto-cancel after 90 days
-- No real money is processed
-- Data is isolated from production
+- No real money is processed, and data is isolated from production
+- Customer-facing emails (receipts, renewal reminders) are only delivered to members of your organization; `you+test@example.com` aliases are accepted
+- The API allows 100 requests per minute, against 500 in production, which matters for large integration suites
 
 ## Test Cards
 
-Polar uses Stripe for payment processing. Use these test card numbers:
-
-### Successful Payments
-
-| Card Number | Brand | CVC | Expiry |
-|-------------|-------|-----|--------|
-| 4242 4242 4242 4242 | Visa | Any 3 digits | Any future date |
-| 5555 5555 5555 4444 | Mastercard | Any 3 digits | Any future date |
-| 3782 822463 10005 | Amex | Any 4 digits | Any future date |
-| 6011 1111 1111 1117 | Discover | Any 3 digits | Any future date |
-
-### Declined Payments
-
-| Card Number | Decline Reason |
-|-------------|----------------|
-| 4000 0000 0000 0002 | Generic decline |
-| 4000 0000 0000 9995 | Insufficient funds |
-| 4000 0000 0000 9987 | Lost card |
-| 4000 0000 0000 9979 | Stolen card |
-| 4000 0000 0000 0069 | Expired card |
-| 4000 0000 0000 0127 | Incorrect CVC |
-
-### 3D Secure Testing
+Polar uses Stripe for payment processing, so any of [Stripe's test cards](https://docs.stripe.com/testing#cards) work. Use a future expiry date and any CVC:
 
 | Card Number | Behavior |
 |-------------|----------|
-| 4000 0027 6000 3184 | Requires 3DS authentication |
-| 4000 0000 0000 3220 | Requires 3DS authentication |
+| 4242 4242 4242 4242 | Successful payment |
+| 4000 0000 0000 0002 | Generic decline |
+| 4000 0000 0000 9995 | Insufficient funds |
+| 4000 0027 6000 3184 | Requires 3D Secure authentication |
 
 ## Local Webhook Testing
 
@@ -118,13 +89,15 @@ export POLAR_ACCESS_TOKEN=polar_oat_...   # scopes: webhooks:read, webhooks:writ
 export POLAR_ENVIRONMENT=sandbox
 ```
 
+If `POLAR_ACCESS_TOKEN` is already exported in the shell, for example from the app's `.env`, the CLI uses it instead of the login.
+
 ### Forward events to your app
 
 ```bash
 polar webhook listen 3000/api/polar/webhook
 ```
 
-`listen` takes a port, a `port/path`, or a full URL. It runs until stopped, so start it in its own terminal or as a background process and keep it running while you test. It forwards every webhook event for the organization, including the ones real sandbox activity produces, such as completing a test checkout.
+`listen` takes a port, a `port/path`, or a full URL. It runs until stopped, so start it in its own terminal or as a background process and keep it running while you test. It forwards every webhook event for the organization, including the ones real sandbox activity produces, such as completing a test checkout. If the account has several organizations, pick one with `--org <id>` or `polar auth org`.
 
 ### Set the webhook secret
 
@@ -158,52 +131,46 @@ polar webhook trigger order.paid --seed 7               # the same IDs on every 
 
 ### Test Checkout Flow
 
+Use an organization access token with the `products:write` and `checkouts:write` scopes. Organization tokens already imply the organization, so don't pass `organization_id`.
+
 ```typescript
 import { describe, it, expect, beforeAll } from "vitest";
-import { Polar } from "@polar-sh/sdk";
+import { createPolar } from "@polar-sh/sdk/2026-10";
+
+const polar = createPolar({
+  accessToken: process.env.POLAR_ACCESS_TOKEN!,
+  environment: "sandbox",
+});
 
 describe("Polar Checkout", () => {
-  const polar = new Polar({
-    accessToken: process.env.POLAR_SANDBOX_TOKEN!,
-    server: "sandbox",
-  });
-
   let testProductId: string;
 
   beforeAll(async () => {
-    // Create test product
     const product = await polar.products.create({
       name: "Test Product",
-      organizationId: process.env.POLAR_ORG_ID!,
-      prices: [{
-        type: "one_time",
-        amountType: "fixed",
-        priceAmount: 1000,
-        priceCurrency: "usd",
-      }],
+      prices: [{ amount_type: "fixed", price_amount: 1000, price_currency: "usd" }],
     });
     testProductId = product.id;
   });
 
-  it("should create checkout session", async () => {
+  it("creates a checkout session", async () => {
     const checkout = await polar.checkouts.create({
       products: [testProductId],
-      successUrl: "http://localhost:3000/success",
-      customerEmail: "test@example.com",
+      success_url: "http://localhost:3000/success",
+      customer_email: "test@example.com",
     });
 
     expect(checkout.status).toBe("open");
-    expect(checkout.url).toBeDefined();
     expect(checkout.url).toContain("sandbox");
   });
 
-  it("should retrieve checkout", async () => {
+  it("retrieves a checkout", async () => {
     const checkout = await polar.checkouts.create({
       products: [testProductId],
-      successUrl: "http://localhost:3000/success",
+      success_url: "http://localhost:3000/success",
     });
 
-    const retrieved = await polar.checkouts.get({ id: checkout.id });
+    const retrieved = await polar.checkouts.get(checkout.id);
     expect(retrieved.id).toBe(checkout.id);
   });
 });
@@ -211,15 +178,15 @@ describe("Polar Checkout", () => {
 
 ### Test Webhook Handler
 
-Generate fixtures from real payloads instead of writing them by hand. `--json` prints the payload without sending it, so `listen` doesn't need to be running:
+Generate fixtures from real payloads instead of writing them by hand. `--dry-run` prints the payload without sending it, so `listen` doesn't need to be running:
 
 ```bash
 mkdir -p test/fixtures
-polar webhook trigger order.paid --json --seed 1 > test/fixtures/order.paid.json
-polar webhook trigger subscription.created --json --seed 1 > test/fixtures/subscription.created.json
+polar webhook trigger order.paid --dry-run --json --seed 1 > test/fixtures/order.paid.json
+polar webhook trigger subscription.created --dry-run --json --seed 1 > test/fixtures/subscription.created.json
 ```
 
-Sign them the way Polar does ([Standard Webhooks](https://www.standardwebhooks.com/)): an HMAC-SHA256 of `id.timestamp.body`, base64-encoded and keyed with the secret string. This test calls the webhook route from `polar-integration` Recipe 3 directly:
+Sign them the way `polar webhook listen` does ([Standard Webhooks](https://www.standardwebhooks.com/)): an HMAC-SHA256 of `id.timestamp.body`, base64-encoded and keyed with the secret string. This test calls the webhook route from `polar-integration` Recipe 3 directly:
 
 ```typescript
 import { createHmac } from "node:crypto";
@@ -256,7 +223,7 @@ describe("Polar webhook handler", () => {
   it("accepts a signed order.paid event", async () => {
     const body = await readFile("test/fixtures/order.paid.json", "utf8");
     const response = await POST(webhookRequest(body));
-    expect(response.status).toBe(200);
+    expect(response.status).toBe(202);
   });
 
   it("rejects an invalid signature", async () => {
@@ -269,27 +236,28 @@ describe("Polar webhook handler", () => {
 
 ### Test License Key Validation
 
-```typescript
-describe("License Keys", () => {
-  it("should validate license key", async () => {
-    // First create a customer with a license key benefit
-    // Then validate the key
-    const result = await polar.licenseKeys.validate({
-      key: "TEST-XXXX-XXXX-XXXX",
-      organizationId: process.env.POLAR_ORG_ID!,
-    });
+Validation needs a token with `license_keys:write`. A valid key returns `status: "granted"`; an unknown key throws `ResourceNotFound`:
 
-    expect(result.valid).toBe(true);
-    expect(result.customer).toBeDefined();
+```typescript
+import { describe, it, expect } from "vitest";
+import { createPolar, errors } from "@polar-sh/sdk/2026-10";
+
+const polar = createPolar({
+  accessToken: process.env.POLAR_ACCESS_TOKEN!,
+  environment: "sandbox",
+});
+const organization_id = process.env.POLAR_ORG_ID!;
+
+describe("License keys", () => {
+  it("validates a granted key", async () => {
+    const result = await polar.licenseKeys.validate({ key: process.env.TEST_LICENSE_KEY!, organization_id });
+    expect(result.status).toBe("granted");
   });
 
-  it("should reject invalid license key", async () => {
-    const result = await polar.licenseKeys.validate({
-      key: "INVALID-KEY",
-      organizationId: process.env.POLAR_ORG_ID!,
-    });
-
-    expect(result.valid).toBe(false);
+  it("rejects an unknown key", async () => {
+    await expect(
+      polar.licenseKeys.validate({ key: "INVALID-KEY", organization_id }),
+    ).rejects.toBeInstanceOf(errors.ResourceNotFound);
   });
 });
 ```
@@ -298,42 +266,40 @@ describe("License Keys", () => {
 
 ### Mock SDK
 
+Mock `createPolar` and keep the real `webhooks` and `errors` exports. Responses use the same `snake_case` fields as the API:
+
 ```typescript
 import { vi } from "vitest";
 
-// Mock the entire SDK
-vi.mock("@polar-sh/sdk", () => ({
-  Polar: vi.fn().mockImplementation(() => ({
+vi.mock("@polar-sh/sdk/2026-10", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@polar-sh/sdk/2026-10")>()),
+  createPolar: () => ({
     checkouts: {
       create: vi.fn().mockResolvedValue({
         id: "checkout_mock",
         url: "https://sandbox.polar.sh/checkout/mock",
         status: "open",
       }),
-      get: vi.fn().mockResolvedValue({
-        id: "checkout_mock",
-        status: "succeeded",
-      }),
+      get: vi.fn().mockResolvedValue({ id: "checkout_mock", status: "succeeded" }),
     },
     customers: {
-      getState: vi.fn().mockResolvedValue({
-        activeSubscriptions: [
-          { id: "sub_mock", status: "active", productId: "prod_mock" },
-        ],
-        grantedBenefits: [],
+      getStateExternal: vi.fn().mockResolvedValue({
+        active_subscriptions: [{ id: "sub_mock", status: "active", product_id: "prod_mock" }],
+        granted_benefits: [],
+        active_meters: [],
       }),
     },
     subscriptions: {
-      list: vi.fn().mockResolvedValue([]),
-      cancel: vi.fn().mockResolvedValue({}),
+      revoke: vi.fn(),
+      update: vi.fn(),
     },
-  })),
+  }),
 }));
 ```
 
 ### Mock Webhook Payloads
 
-Load the fixtures generated with `polar webhook trigger <event> --json` (see Test Webhook Handler). Hand-written payloads drift from the real shape, and `validateEvent` rejects them.
+Load the fixtures generated with `polar webhook trigger <event> --dry-run --json` (see Test Webhook Handler). Hand-written payloads drift from the real shape, and `validateEvent` only checks the signature and event type, so the drift goes unnoticed.
 
 ```typescript
 import orderPaid from "./fixtures/order.paid.json";
@@ -355,16 +321,14 @@ jobs:
 
     env:
       POLAR_ACCESS_TOKEN: ${{ secrets.POLAR_SANDBOX_TOKEN }}
-      POLAR_WEBHOOK_SECRET: ${{ secrets.POLAR_SANDBOX_WEBHOOK_SECRET }}
       POLAR_ORG_ID: ${{ secrets.POLAR_SANDBOX_ORG_ID }}
-      POLAR_SERVER: sandbox
 
     steps:
       - uses: actions/checkout@v4
 
       - uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: "22"
           cache: "npm"
 
       - run: npm ci
@@ -376,14 +340,16 @@ jobs:
         run: npm run test:integration
 ```
 
+If CI also runs the Polar CLI, add `POLAR_ENVIRONMENT: sandbox`.
+
 ### Environment Setup
 
 Create sandbox credentials specifically for CI:
 
 1. Create a dedicated sandbox organization for CI
-2. Generate a CI-specific access token
+2. Create an organization access token for it with only the scopes the tests need (`polar auth token --scope products:write --scope checkouts:write` opens the token page with them preselected)
 3. Commit the webhook fixtures; handler tests sign them with a test secret and need no webhook endpoint
-4. Store credentials in GitHub Secrets
+4. Store the token and organization ID in GitHub Secrets
 
 ## Debugging Tips
 
@@ -409,24 +375,28 @@ For a deployed endpoint:
 **Checkout not completing**
 - Use test cards, not real cards
 - Check browser console for errors
-- Verify successUrl is correct
+- Verify `success_url` is correct
 
 **API returns 401**
-- Verify you're using sandbox token with sandbox API
-- Check token hasn't expired
-- Ensure token has required scopes
+- Verify you're using a sandbox token with the sandbox API
+- Check the token hasn't expired or been revoked
 
-### Enable Debug Logging
+**API returns 403**
+- The token is missing a scope the endpoint needs
+
+### Inspect API Errors
+
+The SDK throws typed errors with the HTTP status and response body:
 
 ```typescript
-const polar = new Polar({
-  accessToken: process.env.POLAR_ACCESS_TOKEN,
-  server: "sandbox",
-  // Enable debug mode if available
-});
+import { PolarClientError } from "@polar-sh/sdk";
 
-// Log all requests
-polar.checkouts.create({...}).then(console.log).catch(console.error);
+try {
+  await polar.checkouts.create({ products: [productId], success_url: "http://localhost:3000/success" });
+} catch (error) {
+  if (error instanceof PolarClientError) console.error(error.statusCode, error.error);
+  throw error;
+}
 ```
 
 ## Test Checklist
