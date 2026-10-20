@@ -4,6 +4,7 @@ on:
   pull_request:
   push:
     branches: [main]
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -31,6 +32,26 @@ jobs:
           node-version: 24
       - run: npm install -g @polar-sh/cli
       - run: node .github/scripts/check-plugin.mjs --cli "$(command -v polar)"
+
+  samples:
+    name: TypeScript samples against the published SDK
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: actions/setup-node@v7.1.0
+        with:
+          node-version: 24
+      - run: node .github/scripts/check-samples.mjs
+
+  links:
+    name: Links in docs
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: actions/setup-node@v7.1.0
+        with:
+          node-version: 24
+      - run: node .github/scripts/check-plugin.mjs --links
 
   claude:
     name: Claude Code

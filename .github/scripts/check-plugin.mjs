@@ -21,6 +21,7 @@ const MAX_TEXT_FILE_BYTES = 256 * 1024;
 const PIPE_TO_SHELL = /(curl|wget)\b[^\n]*\|\s*(ba|z)?sh\b|\|\s*iex\b/;
 const JUNK_FILES = /(^|\/)(\.DS_Store|Thumbs\.db|desktop\.ini|__MACOSX)(\/|$)/;
 const SKILL_NAME = /^[a-z0-9]+(-[a-z0-9]+)*$/;
+const MARKDOWN_LINK = /\]\((https?:\/\/[^)\s]+)\)|<(https?:\/\/[^>\s]+)>/g;
 
 function checkNames() {
   for (const path of NAMED_FILES) {
@@ -142,10 +143,13 @@ function codeSnippets(text) {
   return snippets;
 }
 
+function documents() {
+  return ["README.md", ...readdirSync("skills").map((directory) => join("skills", directory, "SKILL.md"))];
+}
+
 function cliCommands() {
   const commands = new Map();
-  const documents = ["README.md", ...readdirSync("skills").map((directory) => join("skills", directory, "SKILL.md"))];
-  for (const document of documents) {
+  for (const document of documents()) {
     for (const snippet of codeSnippets(readFileSync(document, "utf8"))) {
       for (const [, rest] of snippet.matchAll(/(?:^|[\s($])polar ([^#|;&>)]*)/g)) {
         const tokens = rest.trim().split(/\s+/);
@@ -179,8 +183,34 @@ function checkCli(binary) {
   }
 }
 
+function linkStatus(url) {
+  return fetch(url, { signal: AbortSignal.timeout(20_000) }).then(
+    (response) => (response.ok ? null : `HTTP ${response.status}`),
+    (error) => error.cause?.code ?? error.message,
+  );
+}
+
+async function checkLinks() {
+  const links = new Map();
+  for (const document of documents()) {
+    for (const [, markdownUrl, autolinkUrl] of readFileSync(document, "utf8").matchAll(MARKDOWN_LINK)) {
+      const url = (markdownUrl ?? autolinkUrl).split("#")[0];
+      links.set(url, [...new Set([...(links.get(url) ?? []), document])]);
+    }
+  }
+  await Promise.all(
+    [...links].map(async ([url, linkedFrom]) => {
+      const status = (await linkStatus(url)) && (await linkStatus(url));
+      if (status) fail(`${url} (${linkedFrom.join(", ")}): ${status}`);
+      else console.log(url);
+    }),
+  );
+}
+
 const cliFlag = process.argv.indexOf("--cli");
-if (cliFlag === -1) {
+if (process.argv.includes("--links")) {
+  await checkLinks();
+} else if (cliFlag === -1) {
   checkNames();
   checkVersions();
   checkChangelog();

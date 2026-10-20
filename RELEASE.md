@@ -7,7 +7,7 @@ Every release gets a version number, a changelog entry, a `vX.Y.Z` tag and a Git
 On a new branch from `main`, run:
 
 ```bash
-node .github/scripts/bump-version.mjs patch 'Change 1', 'Change 2'
+node .github/scripts/bump-version.mjs patch 'Change 1' 'Change 2'
 ```
 
 Use `patch`, `minor` or `major`, or an exact version such as `0.2.0`. Each quoted argument becomes one bullet. Use single quotes so backticks stay literal.
@@ -25,7 +25,7 @@ The [Validate plugin](https://github.com/polarsource/agent-toolkit/actions/workf
 
 Merging runs the [Release](https://github.com/polarsource/agent-toolkit/actions/workflows/release.yml) workflow, which creates the `vX.Y.Z` tag, the GitHub release with your changelog notes, and the `polar-openai-X.Y.Z` ZIP.
 
-## 3. Update each listing
+## 4. Update each listing
 
 | Where | What to do |
 | --- | --- |
