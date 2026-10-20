@@ -1,0 +1,120 @@
+name: Validate plugin
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  checks:
+    name: Manifests, skills and files
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: actions/setup-node@v7.1.0
+        with:
+          node-version: 24
+      - run: node .github/scripts/check-plugin.mjs
+
+  cli:
+    name: Polar CLI commands in docs
+    runs-on: ubuntu-latest
+    env:
+      POLAR_CLI_TELEMETRY_OPTOUT: "1"
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: actions/setup-node@v7.1.0
+        with:
+          node-version: 24
+      - run: npm install -g @polar-sh/cli
+      - run: node .github/scripts/check-plugin.mjs --cli "$(command -v polar)"
+
+  claude:
+    name: Claude Code
+    runs-on: ubuntu-latest
+    env:
+      CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: "1"
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: actions/setup-node@v7.1.0
+        with:
+          node-version: 24
+      - run: npx -y @anthropic-ai/claude-code@2.1.303 plugin validate . --strict
+
+  codex:
+    name: Codex
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: actions/setup-node@v7.1.0
+        with:
+          node-version: 24
+      - run: |
+          export CODEX_HOME="$RUNNER_TEMP/codex"
+          mkdir -p "$CODEX_HOME"
+          codex() { npx -y @openai/codex@0.163.0 "$@"; }
+          codex plugin marketplace add "$GITHUB_WORKSPACE"
+          codex plugin add polar@polar
+          servers=$(codex mcp list)
+          echo "$servers"
+          for server in $(jq -r '.mcpServers | keys[]' .mcp.json); do
+            echo "$servers" | grep -q "^$server " || { echo "::error::Codex did not load the $server MCP server"; exit 1; }
+          done
+
+  cursor:
+    name: Cursor
+    runs-on: ubuntu-latest
+    env:
+      SCHEMAS: https://raw.githubusercontent.com/cursor/plugins/88d47514b82e7c44f00f2b2a72ff6dd12158038c/schemas
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: actions/setup-node@v7.1.0
+        with:
+          node-version: 24
+      - run: |
+          for manifest in plugin marketplace; do
+            curl -fsSL "$SCHEMAS/$manifest.schema.json" -o "$RUNNER_TEMP/$manifest.schema.json"
+            npx -y ajv-cli@5.0.0 validate --spec=draft7 --strict=false --validate-formats=false \
+              -s "$RUNNER_TEMP/$manifest.schema.json" -d ".cursor-plugin/$manifest.json"
+          done
+
+  gemini:
+    name: Gemini CLI
+    runs-on: ubuntu-latest
+    env:
+      GEMINI_CLI_NO_RELAUNCH: "true"
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: actions/setup-node@v7.1.0
+        with:
+          node-version: 24
+      - run: |
+          export HOME="$RUNNER_TEMP/gemini"
+          mkdir -p "$HOME"
+          gemini() { npx -y @google/gemini-cli@0.64.0 "$@"; }
+          printf 'y\n' | gemini extensions install "$GITHUB_WORKSPACE" --consent
+          extensions=$(gemini extensions list 2>&1)
+          echo "$extensions"
+          for name in $(jq -r '.mcpServers | keys[]' gemini-extension.json) $(ls skills); do
+            echo "$extensions" | grep -qE "^ +$name(:|$)" || { echo "::error::Gemini CLI did not load $name"; exit 1; }
+          done
+
+  antigravity:
+    name: Antigravity
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - run: |
+          brew update --quiet
+          brew install --cask antigravity-cli
+          agy --version
+      - run: |
+          report=$(agy plugin validate . --strict --json)
+          echo "$report"
+          servers=$(jq '.mcpServers | length' mcp_config.json)
+          skills=$(ls skills | wc -l | tr -d ' ')
+          echo "$report" | jq -e --argjson servers "$servers" --argjson skills "$skills" \
+            '.components.mcpServers == $servers and .components.skills == $skills and (.findings | length) == 0'
