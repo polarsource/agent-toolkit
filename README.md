@@ -1,5 +1,10 @@
 # Polar Agent Toolkit
 
+[![Validate plugin](https://github.com/polarsource/agent-toolkit/actions/workflows/validate.yml/badge.svg?branch=main)](https://github.com/polarsource/agent-toolkit/actions/workflows/validate.yml)
+[![Skill drift review](https://github.com/polarsource/agent-toolkit/actions/workflows/drift.yml/badge.svg)](https://github.com/polarsource/agent-toolkit/actions/workflows/drift.yml)
+[![Latest release](https://img.shields.io/github/v/release/polarsource/agent-toolkit)](https://github.com/polarsource/agent-toolkit/releases/latest)
+[![License](https://img.shields.io/github/license/polarsource/agent-toolkit)](https://github.com/polarsource/agent-toolkit/blob/main/LICENSE)
+
 Polar's plugin for AI coding agents. It connects your agent to [Polar](https://polar.sh), the open-source payment infrastructure platform, so it can set up products, checkouts, customer portals and webhooks in your app, test them against the Polar sandbox, and help you migrate from another payment provider.
 
 The skills follow the [Agent Skills](https://agentskills.io/) format, so they also work in agents that don't support plugins.
