@@ -102,7 +102,6 @@ The skills also ask your agent to run commands and write code that talk to these
 ## Support
 
 - [Polar documentation](https://polar.sh/docs)
-- [Contact Polar support](https://polar.sh/docs/support)
 - [Report an issue with this plugin](https://github.com/polarsource/agent-toolkit/issues)
 
 ## License
