@@ -1,0 +1,4 @@
+{
+  "name": "polar",
+  "description": "Add Polar payments, subscriptions and usage billing to your app. Connects to your Polar organization through the Polar MCP server and adds skills for setup, Checkout and webhook integration, and sandbox testing."
+}

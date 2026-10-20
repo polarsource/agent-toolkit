@@ -1,0 +1,10 @@
+{
+  "mcpServers": {
+    "polar": {
+      "serverUrl": "https://mcp.polar.sh/mcp/polar-mcp"
+    },
+    "polar-sandbox": {
+      "serverUrl": "https://mcp.polar.sh/mcp/polar-sandbox"
+    }
+  }
+}

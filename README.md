@@ -54,6 +54,22 @@ Then sign in to Polar in your browser with `codex mcp login polar` or `codex mcp
 
 In Cursor, open **Customize**, choose **From GitHub Repository** and enter `https://github.com/polarsource/agent-toolkit`. Then sign in to `polar` or `polar-sandbox` from Cursor's MCP settings.
 
+### Gemini CLI
+
+```bash
+gemini extensions install https://github.com/polarsource/agent-toolkit
+```
+
+Then sign in to Polar with `/mcp auth polar` or `/mcp auth polar-sandbox`.
+
+### Antigravity
+
+```bash
+agy plugin install https://github.com/polarsource/agent-toolkit
+```
+
+Then sign in to `polar` or `polar-sandbox` from Antigravity's MCP settings.
+
 ### Other agents
 
 Install the skills with [skills](https://github.com/vercel-labs/skills):
