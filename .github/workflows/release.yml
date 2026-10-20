@@ -30,6 +30,8 @@ jobs:
           version=$(jq -r .version .claude-plugin/plugin.json)
           echo "version=$version" >> "$GITHUB_OUTPUT"
           echo "tag=v$version" >> "$GITHUB_OUTPUT"
+          awk -v heading="## $version" '$0 == heading { found = 1; next } /^## / { found = 0 } found' \
+            CHANGELOG.md > "$RUNNER_TEMP/notes.md"
 
       - name: Build the OpenAI plugin ZIP
         env:
@@ -38,14 +40,13 @@ jobs:
         run: |
           stage="$RUNNER_TEMP/polar"
           mkdir -p "$stage/.codex-plugin"
-          if [ -n "$DEMO_RECORDING_URL" ]; then
-            jq --arg url "$DEMO_RECORDING_URL" \
-              '.extensions["com.openai"].review.demo_recording_url = $url' \
-              openai/plugin.json > "$stage/.codex-plugin/plugin.json"
-          else
+          if [ -z "$DEMO_RECORDING_URL" ]; then
             echo "::warning::The OPENAI_DEMO_RECORDING_URL secret isn't set, so OpenAI's portal will reject this ZIP."
-            cp openai/plugin.json "$stage/.codex-plugin/plugin.json"
           fi
+          jq --rawfile notes "$RUNNER_TEMP/notes.md" --arg url "$DEMO_RECORDING_URL" '
+            .extensions["com.openai"].publication.release_notes = ($notes | gsub("^\\s+|\\s+$"; ""))
+            | if $url == "" then . else .extensions["com.openai"].review.demo_recording_url = $url end
+          ' openai/plugin.json > "$stage/.codex-plugin/plugin.json"
           cp openai/mcp.json "$stage/.mcp.json"
           cp -R skills README.md LICENSE "$stage/"
           for asset in $(jq -r '.interface.logo, .interface.composerIcon' openai/plugin.json | sort -u); do
@@ -71,6 +72,4 @@ jobs:
             echo "Release $TAG already exists."
             exit 0
           fi
-          awk -v heading="## $VERSION" '$0 == heading { found = 1; next } /^## / { found = 0 } found' \
-            CHANGELOG.md > "$RUNNER_TEMP/notes.md"
           gh release create "$TAG" --target "$GITHUB_SHA" --title "$TAG" --notes-file "$RUNNER_TEMP/notes.md"
