@@ -50,6 +50,10 @@ codex plugin add polar@polar
 
 Then sign in to Polar in your browser with `codex mcp login polar` or `codex mcp login polar-sandbox`. Codex uses the skills on its own when a task matches.
 
+### Cursor
+
+In Cursor, open **Customize**, choose **From GitHub Repository** and enter `https://github.com/polarsource/agent-toolkit`. Then sign in to `polar` or `polar-sandbox` from Cursor's MCP settings.
+
 ### Other agents
 
 Install the skills with [skills](https://github.com/vercel-labs/skills):
