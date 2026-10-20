@@ -1,0 +1,202 @@
+name: Skill drift review
+
+on:
+  schedule:
+    - cron: "0 7 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+  actions: write
+
+concurrency:
+  group: drift-review
+
+env:
+  BRANCH: drift/skills
+  REVIEWER: sebastianekstrom
+  MODEL: claude-opus-5-5
+  MAX_BUDGET_USD: "10"
+  POLAR_CLI_TELEMETRY_OPTOUT: "1"
+  POLAR_PATHS: >-
+    sdk/CHANGELOG.md sdk/typescript/.agents clients/packages/cli/CHANGELOG.md
+    clients/apps/mcp clients/adapters docs :!docs/openapi
+    server/polar/checkout server/polar/customer_session server/polar/webhook
+    server/polar/license_key server/polar/merchant_migration server/polar/rate_limit.py
+
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    defaults:
+      run:
+        working-directory: toolkit
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          path: toolkit
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/checkout@v7.0.1
+        with:
+          repository: polarsource/polar
+          path: polar
+          fetch-depth: 0
+          filter: blob:none
+          persist-credentials: false
+      - uses: actions/setup-node@v7.1.0
+        with:
+          node-version: 24
+      - run: npm install -g @polar-sh/cli
+
+      - name: Start from the open drift pull request or main
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          pr=$(gh pr list --head "$BRANCH" --state open --json number --jq '.[0].number // empty')
+          echo "PR=$pr" >> "$GITHUB_ENV"
+          if [ -n "$pr" ]; then
+            git checkout "$BRANCH"
+            git merge --no-edit origin/main
+          else
+            git checkout -B "$BRANCH" origin/main
+          fi
+
+      - name: Collect drift signals
+        id: signals
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          since=$(gh run list --workflow drift.yml --status success --limit 1 --json createdAt --jq '.[0].createdAt // empty')
+          since=${since:-$(date -u -d '7 days ago' +%FT%TZ)}
+          base=$(git -C ../polar rev-list -1 --before="$since" HEAD)
+          git -C ../polar log --format='%h %s' "$base..HEAD" -- $POLAR_PATHS > "$RUNNER_TEMP/commits.txt"
+
+          failed=false
+          for args in "" "--cli $(command -v polar)" "--links"; do
+            node .github/scripts/check-plugin.mjs $args >> "$RUNNER_TEMP/checks.txt" 2>&1 || failed=true
+          done
+          node .github/scripts/check-samples.mjs >> "$RUNNER_TEMP/checks.txt" 2>&1 || failed=true
+          cat "$RUNNER_TEMP/checks.txt"
+
+          {
+            cat .github/drift-review.md
+            echo
+            echo "## This run"
+            echo
+            echo "- Monorepo commit: $(git -C ../polar rev-parse HEAD)"
+            echo "- Polar CLI path: $(command -v polar)"
+            if [ -n "$PR" ]; then
+              echo "- Pull request #$PR is open and already bumps the version, so add your lines to the top section of \`CHANGELOG.md\`."
+            else
+              echo "- No drift pull request is open, so bump the version with \`bump-version.mjs\` if you change anything."
+            fi
+            echo
+            echo "## Commits since the last review on $since"
+            echo
+            echo '```'
+            cat "$RUNNER_TEMP/commits.txt"
+            echo '```'
+            echo
+            echo "## Check results"
+            echo
+            if [ "$failed" = true ]; then
+              echo '```'
+              cat "$RUNNER_TEMP/checks.txt"
+              echo '```'
+            else
+              echo "All checks pass."
+            fi
+          } > "$RUNNER_TEMP/prompt.md"
+
+          if [ "$failed" = false ] && [ ! -s "$RUNNER_TEMP/commits.txt" ]; then
+            echo "No failing checks and no monorepo changes since $since"
+            echo "review=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "review=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Review the skills with Claude
+        if: steps.signals.outputs.review == 'true'
+        env:
+          ANTHROPIC_BASE_URL: https://gateway-us.pydantic.dev/proxy/anthropic
+          ANTHROPIC_AUTH_TOKEN: ${{ secrets.PYDANTIC_AI_GATEWAY_API_KEY }}
+          CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: "1"
+        run: |
+          npx -y @anthropic-ai/claude-code@2.1.303 -p \
+            --model "$MODEL" \
+            --max-budget-usd "$MAX_BUDGET_USD" \
+            --output-format json \
+            --no-session-persistence \
+            --strict-mcp-config \
+            --permission-mode dontAsk \
+            --add-dir ../polar \
+            --allowedTools Read Glob Grep Edit Write \
+              "Bash(node .github/scripts/check-plugin.mjs:*)" \
+              "Bash(node .github/scripts/check-samples.mjs:*)" \
+              "Bash(node .github/scripts/bump-version.mjs:*)" \
+              "Bash(git -C ../polar show:*)" \
+              "Bash(git -C ../polar log:*)" \
+              "Bash(git -C ../polar diff:*)" \
+              "Bash(git diff:*)" \
+              "Bash(git status:*)" \
+              "Bash(npm view:*)" \
+            --disallowedTools "Edit(.github/**)" "Edit(.git/**)" \
+            < "$RUNNER_TEMP/prompt.md" > "$RUNNER_TEMP/claude.json" || true
+          jq '{subtype, is_error, num_turns, total_cost_usd, permission_denials, result}' "$RUNNER_TEMP/claude.json"
+          printf 'COST=%.2f\n' "$(jq -r '.total_cost_usd // 0' "$RUNNER_TEMP/claude.json")" >> "$GITHUB_ENV"
+          jq -e '.is_error == false' "$RUNNER_TEMP/claude.json" > /dev/null
+
+      - name: Open or update the pull request
+        if: steps.signals.outputs.review == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if [ -f DRIFT_SUMMARY.md ]; then mv DRIFT_SUMMARY.md "$RUNNER_TEMP/summary.md"; fi
+          changed=$(git status --porcelain)
+          if [ -z "$changed" ]; then
+            echo "No significant drift"
+            exit 0
+          fi
+          if [ ! -f "$RUNNER_TEMP/summary.md" ]; then
+            echo "::error::Claude changed files without writing DRIFT_SUMMARY.md"
+            exit 1
+          fi
+          unexpected=$(echo "$changed" | cut -c4- | grep -vE '^(skills/|README\.md$|CHANGELOG\.md$|\.claude-plugin/plugin\.json$|\.cursor-plugin/plugin\.json$|openai/plugin\.json$|gemini-extension\.json$)' || true)
+          if [ -n "$unexpected" ]; then
+            echo "::error::Claude changed files outside the skills: $unexpected"
+            exit 1
+          fi
+
+          node .github/scripts/check-plugin.mjs
+          node .github/scripts/check-samples.mjs
+          node .github/scripts/check-plugin.mjs --cli "$(command -v polar)"
+          node .github/scripts/check-plugin.mjs --links
+          if [ "$(jq -r .version .claude-plugin/plugin.json)" = "$(git show origin/main:.claude-plugin/plugin.json | jq -r .version)" ]; then
+            echo "::error::The version wasn't bumped"
+            exit 1
+          fi
+
+          git add -A
+          git commit -m "Fix skill drift"
+          gh auth setup-git
+          git push --force-with-lease origin "HEAD:$BRANCH"
+
+          {
+            cat "$RUNNER_TEMP/summary.md"
+            echo
+            echo "---"
+            echo
+            echo "Found by the [weekly drift review]($GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID) for \$$COST. After merging, update the listings as described in [RELEASE.md]($GITHUB_SERVER_URL/$GITHUB_REPOSITORY/blob/main/RELEASE.md)."
+            echo
+            echo "@$REVIEWER"
+          } > "$RUNNER_TEMP/body.md"
+          if [ -n "$PR" ]; then
+            gh pr comment "$PR" --body-file "$RUNNER_TEMP/body.md"
+          else
+            gh pr create --base main --head "$BRANCH" --title "Fix skill drift" --body-file "$RUNNER_TEMP/body.md" --reviewer "$REVIEWER"
+          fi
+          gh workflow run validate.yml --ref "$BRANCH"

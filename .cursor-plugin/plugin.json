@@ -1,7 +1,7 @@
 {
   "name": "polar",
   "displayName": "Polar",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Add Polar payments, subscriptions and usage billing to your app. Connects Cursor to your Polar organization through the Polar MCP server and adds skills for setup, integration, testing and migrating from other payment platforms.",
   "author": {
     "name": "Polar"
