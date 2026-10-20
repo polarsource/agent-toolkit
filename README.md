@@ -22,7 +22,7 @@ Both servers use OAuth. Nothing connects until you sign in to Polar and authoriz
 | `setup-polar` | Guided setup from scratch: connects the MCP server, creates an organization and a first product, then hands off to `polar-integration`. |
 | `polar-integration` | Adds Checkout, Customer Portal and Webhooks endpoints with `@polar-sh/sdk` to any TS/JS framework, including Next.js, Express, Hono, Astro, SvelteKit, Remix, Nuxt and Cloudflare Workers. |
 | `polar-testing` | Tests an integration against the sandbox: test cards, local webhooks with the Polar CLI (`polar webhook listen`, `polar webhook trigger`), mocks and CI. |
-| `polar-migration` | Plans and runs a migration from Stripe Billing, Paddle, Lemon Squeezy or Gumroad. |
+| `polar-migration` | Guides a migration to Polar: Polar's assisted migration from Stripe Billing, or recreating the catalog and moving customers from Paddle, Lemon Squeezy and others. |
 
 ## Installation
 
@@ -92,7 +92,7 @@ The skills also ask your agent to run commands and write code that talk to these
 - **Polar API** (`api.polar.sh`, `sandbox-api.polar.sh`): the integration code, tests and Polar CLI commands the skills set up call it with your own access token or CLI login.
 - **Polar CLI telemetry** (PostHog): `setup-polar` and `polar-testing` install the [Polar CLI](https://polar.sh/docs/integrate/cli/introduction), which sends one anonymous event per command, such as the command name, duration, CLI version and OS. It never sends access tokens, organization IDs, URLs or payloads. Opt out with `POLAR_CLI_TELEMETRY_OPTOUT=1`.
 - **npm registry**: to install `@polar-sh/cli` and `@polar-sh/sdk`.
-- **Your current payment provider** (Stripe, Paddle or Lemon Squeezy): `polar-migration` writes scripts that export your products, customers and subscriptions with your own API keys so they can be imported into Polar.
+- **Your current payment provider** (Stripe, Paddle or Lemon Squeezy): `polar-migration` may read your existing billing code and data with your own API keys to map customers and products to Polar. Stripe migrations themselves run in Polar's dashboard.
 
 ## Support
 

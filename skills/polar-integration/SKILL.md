@@ -9,33 +9,44 @@ A standalone guide to wiring up Polar's three core HTTP endpoints — Checkout, 
 
 ## Setup
 
-Install the SDK:
+Install the SDK. Version 1.0 and later needs Node.js 22 or newer:
 
 ```bash
 npm install @polar-sh/sdk
 # or pnpm / yarn / bun
 ```
 
-Don't install `@polar-sh/<framework>` packages (e.g. `@polar-sh/nextjs`, `@polar-sh/express`, `@polar-sh/hono`, etc.) — they are deprecated. `@polar-sh/sdk` is all you need for these recipes.
+If the project already uses `@polar-sh/sdk` below 1.0 (signs: `new Polar(...)`, camelCase fields such as `successUrl`, imports from `@polar-sh/sdk/webhooks`), upgrade it first by following the [migration guide](https://github.com/polarsource/polar/blob/main/sdk/typescript/.agents/skills/polar-typescript-sdk/references/migration-from-v0.md). Don't mix the old and new conventions.
+
+Don't install the deprecated `@polar-sh/<framework>` adapters (`@polar-sh/express`, `@polar-sh/hono`, `@polar-sh/fastify`, `@polar-sh/elysia`, `@polar-sh/astro`, `@polar-sh/sveltekit`, `@polar-sh/remix`, `@polar-sh/deno`, `@polar-sh/supabase`). `@polar-sh/nextjs`, `@polar-sh/nuxt`, `@polar-sh/tanstack-start` and `@polar-sh/better-auth` are maintained; keep them if the project already uses them.
 
 Required environment variables (use whatever loader your framework provides — `process.env`, `Deno.env`, `import.meta.env`, etc.):
 
-- `POLAR_ACCESS_TOKEN` — organization access token from the Polar dashboard.
+- `POLAR_ACCESS_TOKEN` — organization access token from the Polar dashboard (Settings → Developers).
 - `POLAR_WEBHOOK_SECRET` — only needed for the webhook recipe.
-- `POLAR_SERVER` — set to `sandbox` while developing, omit (or `production`) in prod.
+- `POLAR_ENVIRONMENT` — `sandbox` while developing; omit it or set `production` in production. Sandbox and production are separate, so each needs its own token.
 
-Construct one client and reuse it:
+The SDK is versioned by API version: the import path pins it. Use `2026-10`, the current version, unless the project already imports another one. Construct one client in a server-only module and reuse it:
 
 ```ts
-import { Polar } from "@polar-sh/sdk";
+import { createPolar, type Environment } from "@polar-sh/sdk/2026-10";
 
-const polar = new Polar({
-  accessToken: process.env.POLAR_ACCESS_TOKEN,
-  server: (process.env.POLAR_SERVER as "sandbox" | "production") ?? "production",
+const accessToken = process.env.POLAR_ACCESS_TOKEN;
+if (!accessToken) throw new Error("POLAR_ACCESS_TOKEN is required");
+
+export const polar = createPolar({
+  accessToken,
+  environment: (process.env.POLAR_ENVIRONMENT as Environment | undefined) || "production",
 });
 ```
 
-The three recipes below are independent — implement only the ones the user asks for.
+The recipes below import this `polar` client. They are independent — implement only the ones the user asks for.
+
+### Conventions
+
+- Service and method names are camelCase (`polar.checkouts.create`, `polar.customerSessions.create`); every request and response field is `snake_case`, exactly as in the HTTP API.
+- Path parameters are positional (`polar.checkouts.get(id)`), request bodies are a single object.
+- Paginated lists come from `iter*` methods consumed with `for await`.
 
 ---
 
@@ -43,105 +54,83 @@ The three recipes below are independent — implement only the ones the user ask
 
 **Goal:** an HTTP endpoint that creates a Polar checkout session and 302-redirects the browser to the hosted checkout page.
 
-**Underlying API:** `POST /v1/checkouts/` (SDK: `polar.checkouts.create(...)`). Full schema: <https://polar.sh/docs/api-reference/checkouts/create-session>.
+**Underlying API:** `POST /v1/checkouts/` (SDK: `polar.checkouts.create(...)`). Full schema: <https://polar.sh/docs/api-reference/current/checkouts/create-checkout-session>.
 
 ### `polar.checkouts.create()` field reference
 
-The SDK uses `camelCase`; the underlying HTTP API uses `snake_case`. Pick whichever you see in the user's existing code.
+| Field | Required | Notes |
+|---|---|---|
+| `products` | yes | Array of product UUIDs. The first is selected by default. |
+| `customer_id` | no | Existing Polar customer ID. |
+| `external_customer_id` | no | Your own user ID. If no Polar customer matches, one is created with this external ID. |
+| `customer_email` | no | |
+| `customer_name` | no | |
+| `customer_billing_name` | no | |
+| `customer_billing_address` | no | `{ country: "US", line1, line2, city, state, postal_code }`. `country` (ISO alpha-2) is required if address is set. |
+| `customer_tax_id` | no | |
+| `customer_ip_address` | no | Used to pick the presentment currency. |
+| `customer_metadata` | no | Copied to the created customer. |
+| `is_business_customer` | no | Default `false`. If `true`, full billing address + name required. |
+| `metadata` | no | Copied to the resulting order/subscription. |
+| `custom_field_data` | no | Map of custom field slug → value. |
+| `discount_id` | no | |
+| `allow_discount_codes` | no | Default `true`. |
+| `require_billing_address` | no | Default `false`. US customers always required regardless. |
+| `seats` | no | Predefined number of seats (seat-based pricing only). |
+| `min_seats` / `max_seats` | no | Seat-based pricing only. |
+| `units` / `min_units` / `max_units` | no | Unit-based pricing only. |
+| `amount` | no | Cents. Only used for `custom` (pay-what-you-want) prices. |
+| `subscription_id` | no | Upgrade an existing free subscription. |
+| `success_url` | no | See below. |
+| `return_url` | no | Back-button URL on the checkout page. |
+| `embed_origin` | no | Set when embedding the checkout in an iframe. |
+| `locale` | no | IETF BCP 47 (`en`, `en-US`, `fr-CA`, ...). Defaults to `en`. |
+| `currency` | no | ISO 4217 (e.g. `usd`, `eur`). |
+| `trial_interval` / `trial_interval_count` | no | Override product trial. |
+| `allow_trial` | no | Default `true`. Set `false` to disable an otherwise-configured trial. |
+| `prices` | no | Map of product ID → ad-hoc prices (override catalog prices). |
 
-| SDK field (camelCase) | API field (snake_case) | Required | Notes |
-|---|---|---|---|
-| `products` | `products` | yes | Array of product UUIDs. The first is selected by default. |
-| `customerId` | `customer_id` | no | Existing Polar customer ID. |
-| `externalCustomerId` | `external_customer_id` | no | Your own user ID. If no Polar customer matches, one is created with this external ID. |
-| `customerEmail` | `customer_email` | no | |
-| `customerName` | `customer_name` | no | |
-| `customerBillingName` | `customer_billing_name` | no | |
-| `customerBillingAddress` | `customer_billing_address` | no | `{ country: "US", line1, line2, city, state, postal_code }`. `country` (ISO alpha-2) is required if address is set. |
-| `customerTaxId` | `customer_tax_id` | no | |
-| `customerIpAddress` | `customer_ip_address` | no | |
-| `customerMetadata` | `customer_metadata` | no | Copied to the created customer. |
-| `isBusinessCustomer` | `is_business_customer` | no | Default `false`. If `true`, full billing address + name required. |
-| `metadata` | `metadata` | no | Copied to the resulting order/subscription. |
-| `customFieldData` | `custom_field_data` | no | Map of custom field slug → value. |
-| `discountId` | `discount_id` | no | |
-| `allowDiscountCodes` | `allow_discount_codes` | no | Default `true`. |
-| `requireBillingAddress` | `require_billing_address` | no | Default `false`. US customers always required regardless. |
-| `seats` | `seats` | no | Predefined number of seats (seat-based pricing only). |
-| `minSeats` / `maxSeats` | `min_seats` / `max_seats` | no | Seat-based pricing only. |
-| `amount` | `amount` | no | Cents. Only used for `custom` (pay-what-you-want) prices. |
-| `subscriptionId` | `subscription_id` | no | Upgrade an existing free subscription. |
-| `successUrl` | `success_url` | no | See below. |
-| `returnUrl` | `return_url` | no | Back-button URL on the checkout page. |
-| `embedOrigin` | `embed_origin` | no | Set when embedding the checkout in an iframe. |
-| `locale` | `locale` | no | IETF BCP 47 (`en`, `en-US`, `fr-CA`, ...). Defaults to `en-US`. |
-| `currency` | `currency` | no | ISO 4217 (e.g. `usd`, `eur`). |
-| `trialInterval` / `trialIntervalCount` | `trial_interval` / `trial_interval_count` | no | Override product trial. |
-| `allowTrial` | `allow_trial` | no | Default `true`. Set `false` to disable an otherwise-configured trial. |
-| `prices` | `prices` | no | Map of product ID → ad-hoc prices (override catalog prices). |
-
-**Response:** `{ id, url, client_secret, expires_at, status, ... }`. Redirect the user to `url`. `client_secret` is only needed if you are embedding the checkout via `@polar-sh/checkout`.
+**Response:** `{ id, url, client_secret, expires_at, status, ... }`. Redirect the user to `url`. To embed the checkout in an iframe instead, pass `url` to `PolarEmbedCheckout.create` from `@polar-sh/checkout` and set `embed_origin`. `client_secret` is only for client-side checkout calls and custom checkout UIs.
 
 ### Notes on specific fields
 
-- **`successUrl` and `{CHECKOUT_ID}`.** Polar performs a literal string substitution: any `{CHECKOUT_ID}` token in the URL is replaced with the actual session ID at redirect time. The official API docs example uses `?checkout_id={CHECKOUT_ID}`; you can use any param name you want. Useful when your success page needs to fetch the session via `polar.checkouts.get(checkoutId)`.
-- **`theme` (UI hint, not an API field).** The hosted checkout UI accepts `?theme=light|dark` in the URL. To apply a theme, append it to `result.url` *after* creating the session — it's not a field on `polar.checkouts.create()`.
+- **`success_url` and `{CHECKOUT_ID}`.** Polar performs a literal string substitution: any `{CHECKOUT_ID}` token in the URL is replaced with the actual session ID at redirect time. The official API docs example uses `?checkout_id={CHECKOUT_ID}`; you can use any param name you want. Useful when your success page needs to fetch the session via `polar.checkouts.get(checkoutId)`. Don't treat the redirect as proof of payment — grant access from a verified webhook or customer state.
+- **`theme` (UI hint, not an API field).** The hosted checkout UI accepts `?theme=light|dark` in the URL. To apply a theme, append it to `checkout.url` *after* creating the session.
+- **Customer IDs come from your auth.** When the user is logged in, set `customer_id` or `external_customer_id` from the server-side session, never from the query string: the ID links the order to that customer.
 
 ### Canonical implementation (Web Standards — Request/Response)
 
-Works as-is in Deno, Bun, Cloudflare Workers, Supabase Edge Functions, SvelteKit, Remix, TanStack Start, Astro endpoints, and Next.js Route Handlers (NextRequest extends Request).
-
 ```ts
-import { Polar } from "@polar-sh/sdk";
+import { polar } from "./polar";
 
-const polar = new Polar({
-  accessToken: process.env.POLAR_ACCESS_TOKEN,
-  server: "production",
-});
-
-const SUCCESS_URL = "https://example.com/success?checkoutId={CHECKOUT_ID}";
+const SUCCESS_URL = "https://example.com/success?checkout_id={CHECKOUT_ID}";
 const THEME: "light" | "dark" | undefined = undefined;
 
-export async function GET(request: Request): Promise<Response> {
+export async function handleCheckout(request: Request): Promise<Response> {
   const url = new URL(request.url);
   const products = url.searchParams.getAll("products");
 
   if (products.length === 0) {
-    return Response.json(
-      { error: "Missing products in query params" },
-      { status: 400 },
-    );
+    return Response.json({ error: "Missing products in query params" }, { status: 400 });
   }
 
-  const json = (key: string) =>
-    url.searchParams.has(key)
-      ? JSON.parse(url.searchParams.get(key) ?? "{}")
-      : undefined;
-  const str = (key: string) => url.searchParams.get(key) ?? undefined;
+  const ipAddress =
+    request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ??
+    request.headers.get("x-real-ip") ??
+    request.headers.get("cf-connecting-ip") ??
+    undefined;
 
   try {
-    const result = await polar.checkouts.create({
+    const checkout = await polar.checkouts.create({
       products,
-      successUrl: SUCCESS_URL,
-      customerId: str("customerId"),
-      externalCustomerId: str("customerExternalId"),
-      customerEmail: str("customerEmail"),
-      customerName: str("customerName"),
-      customerBillingAddress: json("customerBillingAddress"),
-      customerTaxId: str("customerTaxId"),
-      customerIpAddress: str("customerIpAddress"),
-      customerMetadata: json("customerMetadata"),
-      metadata: json("metadata"),
-      discountId: str("discountId"),
-      allowDiscountCodes: url.searchParams.has("allowDiscountCodes")
-        ? url.searchParams.get("allowDiscountCodes") === "true"
-        : undefined,
-      seats: url.searchParams.has("seats")
-        ? Number.parseInt(url.searchParams.get("seats") ?? "1", 10)
-        : undefined,
+      success_url: SUCCESS_URL,
+      external_customer_id: await getUserId(request), // your auth helper, or undefined for guests
+      customer_email: url.searchParams.get("customer_email") ?? undefined,
+      customer_ip_address: ipAddress,
+      discount_id: url.searchParams.get("discount_id") ?? undefined,
     });
 
-    const redirectUrl = new URL(result.url);
+    const redirectUrl = new URL(checkout.url);
     if (THEME) redirectUrl.searchParams.set("theme", THEME);
 
     return Response.redirect(redirectUrl.toString(), 302);
@@ -152,61 +141,40 @@ export async function GET(request: Request): Promise<Response> {
 }
 ```
 
-This handler accepts a GET request with `?products=<product_id>` and forwards optional customer-prefill params straight to `polar.checkouts.create()`. Drop fields the caller won't ever provide; add fields from the table above (`metadata`, `embedOrigin`, `locale`, ...) as needed for your use case. If your frontend is server-rendered and already knows the user, hardcode `externalCustomerId` from your auth context instead of reading it from the query.
+This handler accepts a GET request with `?products=<product_id>`. Drop fields you don't need and add fields from the table above (`metadata`, `embed_origin`, `locale`, ...) as needed.
 
 ### Framework variations
 
-The body of the handler is identical — only the signature, URL access, and response constructors change.
+The body of the handler is identical — only the entry point changes:
 
-**Next.js (App Router):** put the canonical handler in `app/api/checkout/route.ts`. `NextRequest`/`NextResponse` are optional; `request: Request` works.
+- **Next.js (App Router):** `app/api/checkout/route.ts`: `export const GET = handleCheckout;`
+- **SvelteKit:** `src/routes/api/checkout/+server.ts`: `export const GET = ({ request }) => handleCheckout(request);`
+- **Astro:** `src/pages/api/checkout.ts`: `export const GET: APIRoute = ({ request }) => handleCheckout(request);`
+- **Remix / React Router:** `export const loader = ({ request }) => handleCheckout(request);`
+- **TanStack Start:** `server: { handlers: { GET: ({ request }) => handleCheckout(request) } }` on the route.
+- **Hono:** `app.get("/checkout", (c) => handleCheckout(c.req.raw));`
+- **Elysia:** `app.get("/checkout", ({ request }) => handleCheckout(request));`
+- **Deno / Supabase Edge Functions:** `Deno.serve(handleCheckout);`
+- **Bun:** `Bun.serve({ fetch: handleCheckout });`
+- **Cloudflare Workers:** `export default { fetch: handleCheckout };` (read secrets from the `env` argument instead of `process.env`).
+- **Nuxt (server route):** `server/api/checkout.get.ts` with `defineEventHandler((event) => handleCheckout(toWebRequest(event)))`.
+- **Express:**
 
-**Express:**
+  ```ts
+  app.get("/checkout", async (req, res) => {
+    const url = new URL(`${req.protocol}://${req.get("host")}${req.originalUrl}`);
+    // ... same body using `url.searchParams`, then res.redirect(redirectUrl.toString()) ...
+  });
+  ```
 
-```ts
-import type { Request, Response } from "express";
+- **Fastify:**
 
-app.get("/checkout", async (req: Request, res: Response) => {
-  const url = new URL(`${req.protocol}://${req.get("host")}${req.originalUrl}`);
-  // ... same body using `url.searchParams` ...
-  // res.redirect(redirectUrl.toString());
-  // res.status(400).json({ error: "..." });
-});
-```
-
-**Fastify:**
-
-```ts
-fastify.get("/checkout", async (request, reply) => {
-  const url = new URL(`${request.protocol}://${request.hostname}${request.url}`);
-  // ... same body ...
-  // reply.redirect(redirectUrl.toString());
-});
-```
-
-**Hono:**
-
-```ts
-app.get("/checkout", async (c) => {
-  const url = new URL(c.req.url);
-  // ... same body ...
-  return c.redirect(redirectUrl.toString());
-});
-```
-
-**Elysia:**
-
-```ts
-app.get("/checkout", ({ request, redirect }) => {
-  const url = new URL(request.url);
-  // ... same body, `return redirect(redirectUrl.toString())` ...
-});
-```
-
-**Nuxt (server route):** `server/api/checkout.get.ts` using `defineEventHandler`, `getQuery`, `sendRedirect(event, url, 302)`.
-
-**SvelteKit:** `src/routes/api/checkout/+server.ts` exporting `GET({ request, url })` — the canonical handler works directly.
-
-**Astro:** `src/pages/api/checkout.ts` exporting `export const GET: APIRoute = async ({ request }) => { ... }`.
+  ```ts
+  fastify.get("/checkout", async (request, reply) => {
+    const url = new URL(`${request.protocol}://${request.hostname}${request.url}`);
+    // ... same body, then reply.redirect(redirectUrl.toString()) ...
+  });
+  ```
 
 ---
 
@@ -214,52 +182,41 @@ app.get("/checkout", ({ request, redirect }) => {
 
 **Goal:** an authenticated endpoint that creates a Polar customer session and 302-redirects to the hosted customer portal (subscriptions, invoices, payment methods).
 
-**Underlying API:** `POST /v1/customer-sessions/` (SDK: `polar.customerSessions.create(...)`). Full schema: <https://polar.sh/docs/api-reference/customer-portal/sessions/create>.
+**Underlying API:** `POST /v1/customer-sessions/` (SDK: `polar.customerSessions.create(...)`). Full schema: <https://polar.sh/docs/api-reference/current/customer-sessions/create-customer-session>.
 
 ### `polar.customerSessions.create()` field reference
 
-The request body is a union — pass **either** `customerId` **or** `externalCustomerId`, not both.
+The request body is a union — pass **either** `customer_id` **or** `external_customer_id`, not both.
 
-| SDK field | API field | Required | Notes |
-|---|---|---|---|
-| `customerId` | `customer_id` | one of these two | Existing Polar customer UUID. |
-| `externalCustomerId` | `external_customer_id` | one of these two | Your own user ID. |
-| `returnUrl` | `return_url` | no | Back-button URL on the portal page. |
-| `memberId` | `member_id` | no | Only for orgs with `member_model_enabled`. Polar customer member UUID. Defaults to the owner member for individual customers. |
-| `externalMemberId` | `external_member_id` | no | Your member ID, alternative to `memberId`. |
+| Field | Required | Notes |
+|---|---|---|
+| `customer_id` | one of these two | Existing Polar customer UUID. |
+| `external_customer_id` | one of these two | Your own user ID. |
+| `return_url` | no | Back-button URL on the portal page. |
+| `member_id` | no | Only for orgs with `member_model_enabled`. Polar customer member UUID. Defaults to the owner member for individual customers. |
+| `external_member_id` | no | Your member ID, alternative to `member_id`. |
 
 **Response:** `{ id, customer_portal_url, token, expires_at, customer, customer_id, return_url, ... }`. Redirect the user to `customer_portal_url`. `token` and `customer` are useful if you want to render portal data inside your own UI instead of redirecting.
 
 ### Canonical implementation
 
 ```ts
-import { Polar } from "@polar-sh/sdk";
-
-const polar = new Polar({
-  accessToken: process.env.POLAR_ACCESS_TOKEN,
-  server: "production",
-});
+import { polar } from "./polar";
 
 const RETURN_URL = "https://example.com/account";
 
-// Replace with your auth: read a cookie/JWT/session and return your user id.
-async function getExternalCustomerId(request: Request): Promise<string | null> {
-  const session = await getSession(request); // your auth helper
-  return session?.userId ?? null;
-}
-
-export async function GET(request: Request): Promise<Response> {
-  const externalCustomerId = await getExternalCustomerId(request);
+export async function handlePortal(request: Request): Promise<Response> {
+  const externalCustomerId = await getUserId(request); // your auth helper
   if (!externalCustomerId) {
     return Response.json({ error: "Unauthorized" }, { status: 401 });
   }
 
   try {
-    const { customerPortalUrl } = await polar.customerSessions.create({
-      externalCustomerId,
-      returnUrl: RETURN_URL,
+    const session = await polar.customerSessions.create({
+      external_customer_id: externalCustomerId,
+      return_url: RETURN_URL,
     });
-    return Response.redirect(customerPortalUrl, 302);
+    return Response.redirect(session.customer_portal_url, 302);
   } catch (error) {
     console.error(error);
     return new Response(null, { status: 500 });
@@ -267,11 +224,11 @@ export async function GET(request: Request): Promise<Response> {
 }
 ```
 
-If you have a Polar customer ID instead of your own user ID, swap `externalCustomerId` for `customerId` in the `polar.customerSessions.create({ ... })` call. `externalCustomerId` is usually what you want — your auth system already knows the user's ID.
+If you have a Polar customer ID instead of your own user ID, swap `external_customer_id` for `customer_id`. `external_customer_id` is usually what you want — your auth system already knows the user's ID. Never let the caller choose another customer's ID.
 
 ### Framework variations
 
-Same shape as Checkout — only the request/response idioms change. Read auth state however your framework expects (Next.js: `cookies()` from `next/headers`, Express: `req.user`, Hono: `c.get('user')`, etc.) and pass the result into `polar.customerSessions.create`.
+Use the same entry points as Recipe 1. Read auth state however your framework expects (Next.js: `await cookies()` from `next/headers`, Express: `req.user`, Hono: `c.get("user")`, etc.).
 
 ---
 
@@ -279,68 +236,51 @@ Same shape as Checkout — only the request/response idioms change. Read auth st
 
 **Goal:** receive Polar webhook events, verify the signature, and dispatch to per-event handlers.
 
-**Contract:** POST endpoint at a stable URL configured in the Polar dashboard. Verifies the `webhook-id`, `webhook-timestamp`, `webhook-signature` headers using `validateEvent` from `@polar-sh/sdk/webhooks`. Returns 200 on success, 403 on signature mismatch.
+**Contract:** POST endpoint at a stable URL configured in the Polar dashboard. Verifies the `webhook-id`, `webhook-timestamp` and `webhook-signature` headers with `webhooks.validateEvent` from the same versioned import as the client. Keep that version equal to the webhook endpoint's API version in the dashboard, so payloads match the SDK's types.
 
 ### Canonical implementation
 
 ```ts
-import { validateEvent, WebhookVerificationError } from "@polar-sh/sdk/webhooks";
+import { webhooks } from "@polar-sh/sdk/2026-10";
 
-const WEBHOOK_SECRET = process.env.POLAR_WEBHOOK_SECRET!;
+const WEBHOOK_SECRET = process.env.POLAR_WEBHOOK_SECRET;
+if (!WEBHOOK_SECRET) throw new Error("POLAR_WEBHOOK_SECRET is required");
 
-export async function POST(request: Request): Promise<Response> {
+export async function handleWebhook(request: Request): Promise<Response> {
   const body = await request.text(); // must be the raw body, not parsed JSON
+  const headers = {
+    "webhook-id": request.headers.get("webhook-id") ?? "",
+    "webhook-timestamp": request.headers.get("webhook-timestamp") ?? "",
+    "webhook-signature": request.headers.get("webhook-signature") ?? "",
+  };
 
-  let event: ReturnType<typeof validateEvent>;
+  let event: webhooks.WebhookPayload;
   try {
-    event = validateEvent(
-      body,
-      {
-        "webhook-id": request.headers.get("webhook-id") ?? "",
-        "webhook-timestamp": request.headers.get("webhook-timestamp") ?? "",
-        "webhook-signature": request.headers.get("webhook-signature") ?? "",
-      },
-      WEBHOOK_SECRET,
-    );
+    event = await webhooks.validateEvent(body, headers, WEBHOOK_SECRET!);
   } catch (error) {
-    if (error instanceof WebhookVerificationError) {
+    if (error instanceof webhooks.PolarWebhookVerificationError) {
       return Response.json({ received: false }, { status: 403 });
+    }
+    if (error instanceof webhooks.PolarWebhookUnknownTypeError) {
+      // Signed, but an event type this SDK version doesn't know. Acknowledge it so Polar doesn't retry.
+      return Response.json({ received: true }, { status: 202 });
+    }
+    if (error instanceof webhooks.PolarWebhookError) {
+      return Response.json({ received: false }, { status: 400 });
     }
     throw error;
   }
 
   switch (event.type) {
-    case "checkout.created":
-    case "checkout.updated":
-      // event.data is the Checkout
-      break;
-
-    case "order.created":
-    case "order.updated":
     case "order.paid":
-    case "order.refunded":
       // event.data is the Order — fulfill, send receipt, etc.
       break;
 
-    case "subscription.created":
-    case "subscription.updated":
     case "subscription.active":
     case "subscription.canceled":
     case "subscription.uncanceled":
     case "subscription.revoked":
       // event.data is the Subscription — flip entitlements in your DB
-      break;
-
-    case "refund.created":
-    case "refund.updated":
-      break;
-
-    case "product.created":
-    case "product.updated":
-      break;
-
-    case "benefit.created":
-    case "benefit.updated":
       break;
 
     case "benefit_grant.created":
@@ -349,27 +289,22 @@ export async function POST(request: Request): Promise<Response> {
       // grant or revoke the user's access to a benefit
       break;
 
-    case "customer.created":
-    case "customer.updated":
-    case "customer.deleted":
     case "customer.state_changed":
-      break;
-
-    case "organization.updated":
+      // event.data is the full customer state — reconcile access from granted_benefits
       break;
   }
 
-  return Response.json({ received: true });
+  return Response.json({ received: true }, { status: 202 });
 }
 ```
 
-`event` is fully typed — TypeScript will narrow `event.data` inside each `case`.
+`event` is fully typed — TypeScript narrows `event.data` inside each `case`. Other events include `checkout.created`, `checkout.updated`, `order.created`, `order.updated`, `order.refunded`, `subscription.created`, `subscription.updated`, `refund.created`, `refund.updated`, `product.created`, `product.updated`, `benefit.created`, `benefit.updated`, `customer.created`, `customer.updated`, `customer.deleted` and `organization.updated`. Subscribe the endpoint only to the events you handle.
 
 ### Critical details
 
-1. **Use the raw request body** for `validateEvent`. If your framework parsed JSON for you (Express's `express.json()`, Fastify's default body parser), disable it on this route or read the raw body manually. Signature verification fails on re-serialized JSON.
-2. **Respond fast.** Polar retries on non-2xx and on timeouts. If a handler is slow (sending email, syncing inventory), enqueue it (queue/cron/background job) and return 200 immediately.
-3. **Idempotency.** Polar may redeliver. Deduplicate on the `webhook-id` header — it's unique per delivery and reused on retries (Standard Webhooks spec). Don't dedupe on `event.data.id`: that's the resource ID and is shared across distinct events about the same resource (e.g. `order.created` and `order.paid`).
+1. **Use the raw request body** for `validateEvent`. If your framework parsed JSON for you (Express's `express.json()`, Fastify's default body parser), the signature check fails on the re-serialized JSON.
+2. **Respond within 2 seconds.** Polar times out after 10 seconds, retries failed deliveries up to 10 times, and disables the endpoint after 10 consecutive failures. Persist or enqueue the event, return 2xx, and do slow work (email, provisioning) in a background job.
+3. **Idempotency.** Polar may redeliver. Deduplicate on the `webhook-id` header — it's unique per delivery and reused on retries. Don't dedupe on `event.data.id`: that's the resource ID and is shared across distinct events about the same resource (e.g. `order.created` and `order.paid`).
 4. **Keep the route public.** Polar doesn't follow redirects, so a route behind auth middleware that redirects to a login page fails every delivery. The signature is the authentication.
 
 ### Test it locally
@@ -385,31 +320,28 @@ Locally, `POLAR_WEBHOOK_SECRET` is the secret from `polar webhook listen --print
 
 ### Framework variations
 
-**Next.js Route Handler:** drop the canonical handler into `app/api/polar/webhook/route.ts`. App Router does not auto-parse the body, so `request.text()` is correct.
+Use the same entry points as Recipe 1 with `POST` (Remix: `action`), plus:
 
-**Express:** mount with the raw body parser on this route only:
+- **Next.js Route Handler:** `app/api/polar/webhook/route.ts`: `export const POST = handleWebhook;`. App Router doesn't parse the body, so `request.text()` is correct.
+- **Express:** register the webhook route with `express.raw` **before** `app.use(express.json())` or any other body parser; once an earlier parser has consumed the stream, the signed bytes are gone. Pass the `Buffer` straight to `validateEvent`:
 
-```ts
-app.post("/polar/webhook", express.raw({ type: "application/json" }), async (req, res) => {
-  const body = (req.body as Buffer).toString("utf8");
-  // ... validateEvent / switch ...
-  res.json({ received: true });
-});
-```
+  ```ts
+  app.post("/polar/webhook", express.raw({ type: "application/json" }), async (req, res, next) => {
+    try {
+      const event = await webhooks.validateEvent(req.body, {
+        "webhook-id": req.header("webhook-id") ?? "",
+        "webhook-timestamp": req.header("webhook-timestamp") ?? "",
+        "webhook-signature": req.header("webhook-signature") ?? "",
+      }, WEBHOOK_SECRET!);
+      // ... handle event, catch the error classes as in the canonical handler ...
+      res.sendStatus(202);
+    } catch (error) {
+      next(error);
+    }
+  });
+  app.use(express.json());
+  ```
 
-**Fastify:** add a content-type parser that preserves the raw body, or use `request.rawBody` with `@fastify/raw-body`.
-
-**Hono:** `await c.req.text()` returns the raw body, and `c.req.header("webhook-id")` reads headers.
-
-**Elysia:** `await request.text()` on the standard `Request`.
-
-**SvelteKit:** in `+server.ts`, `await event.request.text()`.
-
-**Astro:** in `APIRoute`, `await request.text()`.
-
-**Nuxt:** `await readRawBody(event)` from h3.
-
----
-
-- Don't install `@polar-sh/<framework>` packages (e.g. `@polar-sh/express`) — they are deprecated. `@polar-sh/sdk` is all you need for these recipes. The only exceptions are `@polar-sh/nextjs` for Next.js App Router and `@polar-sh/better-auth` for Better Auth.
-
+- **Fastify:** register `fastify-raw-body` and set `config: { rawBody: true }` on the route, then pass `request.rawBody`.
+- **Hono:** `app.post("/polar/webhook", (c) => handleWebhook(c.req.raw));`
+- **Nuxt:** `await readRawBody(event)` from h3 for the body, `getHeader(event, "webhook-id")` for headers.
