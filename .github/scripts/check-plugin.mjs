@@ -39,6 +39,12 @@ function checkVersions() {
   }
 }
 
+function checkChangelog() {
+  const version = readJson(MANIFESTS[0]).version;
+  const sections = readFileSync("CHANGELOG.md", "utf8").match(/^## .+$/gm) ?? [];
+  if (!sections.includes(`## ${version}`)) fail(`CHANGELOG.md: no "## ${version}" section for the current version`);
+}
+
 function serverUrls(path, key) {
   const servers = readJson(path).mcpServers;
   return Object.fromEntries(Object.entries(servers).map(([name, server]) => [name, server[key]]));
@@ -177,6 +183,7 @@ const cliFlag = process.argv.indexOf("--cli");
 if (cliFlag === -1) {
   checkNames();
   checkVersions();
+  checkChangelog();
   checkMcpServers();
   checkSkills();
   checkFiles();
