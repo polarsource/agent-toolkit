@@ -1,0 +1,76 @@
+name: Release
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - CHANGELOG.md
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: Release
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: actions/setup-node@v7.1.0
+        with:
+          node-version: 24
+      - run: node .github/scripts/check-plugin.mjs
+
+      - id: version
+        run: |
+          version=$(jq -r .version .claude-plugin/plugin.json)
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "tag=v$version" >> "$GITHUB_OUTPUT"
+
+      - name: Build the OpenAI plugin ZIP
+        env:
+          DEMO_RECORDING_URL: ${{ secrets.OPENAI_DEMO_RECORDING_URL }}
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          stage="$RUNNER_TEMP/polar"
+          mkdir -p "$stage/.codex-plugin"
+          if [ -n "$DEMO_RECORDING_URL" ]; then
+            jq --arg url "$DEMO_RECORDING_URL" \
+              '.extensions["com.openai"].review.demo_recording_url = $url' \
+              openai/plugin.json > "$stage/.codex-plugin/plugin.json"
+          else
+            echo "::warning::The OPENAI_DEMO_RECORDING_URL secret isn't set, so OpenAI's portal will reject this ZIP."
+            cp openai/plugin.json "$stage/.codex-plugin/plugin.json"
+          fi
+          cp openai/mcp.json "$stage/.mcp.json"
+          cp -R skills README.md LICENSE "$stage/"
+          for asset in $(jq -r '.interface.logo, .interface.composerIcon' openai/plugin.json | sort -u); do
+            mkdir -p "$stage/$(dirname "$asset")"
+            cp "$asset" "$stage/$asset"
+          done
+          (cd "$stage" && zip -qrX "$RUNNER_TEMP/polar-openai-$VERSION.zip" .)
+          unzip -l "$RUNNER_TEMP/polar-openai-$VERSION.zip"
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: polar-openai-${{ steps.version.outputs.version }}
+          path: ${{ runner.temp }}/polar-openai-${{ steps.version.outputs.version }}.zip
+          retention-days: 30
+
+      - name: Create the tag and GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.version.outputs.version }}
+          TAG: ${{ steps.version.outputs.tag }}
+        run: |
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "Release $TAG already exists."
+            exit 0
+          fi
+          awk -v heading="## $VERSION" '$0 == heading { found = 1; next } /^## / { found = 0 } found' \
+            CHANGELOG.md > "$RUNNER_TEMP/notes.md"
+          gh release create "$TAG" --target "$GITHUB_SHA" --title "$TAG" --notes-file "$RUNNER_TEMP/notes.md"
