@@ -94,8 +94,7 @@
         "commerce": false
       },
       "publication": {
-        "countries": [],
-        "release_notes": "First release of the Polar plugin: the Polar MCP server and skills for setup, integration, testing and migration."
+        "countries": []
       }
     }
   }

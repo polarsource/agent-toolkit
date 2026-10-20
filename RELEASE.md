@@ -15,7 +15,7 @@ Use `patch`, `minor` or `major`, or an exact version such as `0.2.0`. Each quote
 The script does the following:
 
 * Sets the version in all four manifests (`.claude-plugin/plugin.json`, `.cursor-plugin/plugin.json`, `openai/plugin.json` and `gemini-extension.json`)
-* Adds a section for it at the top of `CHANGELOG.md`. That section becomes the GitHub release notes, so write it for people who use the plugin. You can still edit it before committing.
+* Adds a section for it at the top of `CHANGELOG.md`. That section becomes the release notes on GitHub and in the OpenAI ZIP, so write it for people who use the plugin. You can still edit it before committing.
 
 ## 2. Open the pull request
 
