@@ -32,13 +32,6 @@ Both servers use OAuth. Nothing connects until you sign in to Polar and authoriz
 /plugin install polar --marketplace polarsource/agent-toolkit
 ```
 
-On Claude Code versions before 2.1.275, add the marketplace first:
-
-```
-/plugin marketplace add polarsource/agent-toolkit
-/plugin install polar@polar
-```
-
 Then run `/mcp`, select `polar` or `polar-sandbox` and sign in to Polar in your browser. Skills are available as `/polar:setup-polar`, `/polar:polar-integration` and so on, and Claude also uses them on its own when a task matches.
 
 ### Codex
@@ -82,15 +75,11 @@ Then connect the MCP server by following the [Polar MCP guide](https://polar.sh/
 
 ## Example prompts
 
-```
-Help me set up Polar in my Next.js app
-```
-```
-Add a Polar webhook handler and test it locally
-```
-```
-Help me migrate my subscriptions from Stripe to Polar
-```
+- "Add Polar checkout and a webhook handler for my Pro plan to this Next.js app"
+- "What's my MRR this month, and how does churn compare to last month?"
+- "Why are customers canceling their subscriptions? Break it down by reason."
+- "Send a sandbox `order.paid` event to my local webhook handler and check that it works"
+- "Create a 25% off launch discount for my yearly plan"
 
 ## Data and privacy
 
