@@ -26,7 +26,7 @@ The sandbox is completely isolated from production. You need separate:
 1. Go to https://sandbox.polar.sh/start
 2. Create a new account (or use "Go to sandbox" from org switcher)
 3. Create a test organization
-4. Generate an access token in Settings → Developers
+4. Generate an access token in Settings → Access Tokens, or with `polar auth token` once the CLI is signed in to the sandbox (see "Install and sign in" below)
 
 ### SDK Configuration
 
