@@ -99,7 +99,7 @@ Hand off to the `polar-integration` skill to generate the Checkout, Customer Por
 Before invoking it, make sure the user has these environment variables ready (use whatever loader their framework provides):
 
 ```bash
-POLAR_ACCESS_TOKEN=          # organization access token: Settings → Developers → New Token, in the sandbox or production dashboard
+POLAR_ACCESS_TOKEN=          # organization access token: Settings → Access Tokens → Create token, in the sandbox or production dashboard
 POLAR_WEBHOOK_SECRET=        # created in Step 7
 POLAR_ENVIRONMENT=sandbox    # omit or set to "production" when going live
 ```
