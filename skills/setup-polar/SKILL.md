@@ -99,10 +99,21 @@ Hand off to the `polar-integration` skill to generate the Checkout, Customer Por
 Before invoking it, make sure the user has these environment variables ready (use whatever loader their framework provides):
 
 ```bash
-POLAR_ACCESS_TOKEN=          # organization access token: Settings → Access Tokens → Create token, in the sandbox or production dashboard
+POLAR_ACCESS_TOKEN=          # organization access token, created below
 POLAR_WEBHOOK_SECRET=        # created in Step 7
 POLAR_ENVIRONMENT=sandbox    # omit or set to "production" when going live
 ```
+
+The quickest way to create the access token is the Polar CLI. Install it with `npm install -g @polar-sh/cli`, then ask the user to run:
+
+```bash
+polar auth login --sandbox
+token=$(polar auth token --scope checkouts:write --scope customer_sessions:write) && echo "POLAR_ACCESS_TOKEN=$token" >> .env
+```
+
+`polar auth token` opens the token page in a browser with those scopes preselected, waits for the user to create the token, and prints it, so this saves it to `.env` without showing it. The token belongs to the active organization and its environment: `polar auth whoami --json` shows which one that is, and `polar auth org` changes it.
+
+Without the CLI, create the token in the sandbox or production dashboard: Settings → Access Tokens → Create token.
 
 Pass along the product ID from Step 5 so checkout links can be tested in Step 8.
 
@@ -110,7 +121,7 @@ Pass along the product ID from Step 5 so checkout links can be tested in Step 8.
 
 Start the dev server, then follow `polar-testing` ("Local Webhook Testing") to forward webhooks to it with the Polar CLI. It needs no tunnel and no dashboard endpoint:
 
-1. Install the CLI and ask the user to run `polar auth login --sandbox`, which opens a browser.
+1. If you skipped it in Step 6, install the CLI and ask the user to run `polar auth login --sandbox`, which opens a browser.
 2. Save the local signing secret to `.env` with `polar webhook listen --print-secret`, then restart the dev server.
 3. Start `polar webhook listen <port>/<webhook-path>` in the background, using the path from the route generated in Step 6. Pass `--org <id from Step 4>` if the account has several organizations.
 4. Run `polar webhook trigger order.paid`. Success is exit 0 with a `Response 2xx` line. On a failure it prints the handler's response and exits with status 1; fix the handler and repeat. If it only says the event was forwarded by your `polar webhook listen` terminal, check the `listen` output.

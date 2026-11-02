@@ -22,7 +22,7 @@ Don't install the deprecated `@polar-sh/<framework>` adapters (`@polar-sh/expres
 
 Required environment variables (use whatever loader your framework provides — `process.env`, `Deno.env`, `import.meta.env`, etc.):
 
-- `POLAR_ACCESS_TOKEN` — organization access token from the Polar dashboard (Settings → Access Tokens).
+- `POLAR_ACCESS_TOKEN` — organization access token. Create it with the Polar CLI (`polar auth token --scope checkouts:write --scope customer_sessions:write`, which opens a browser and prints the token, so ask the user to run it and save the output to the env file) or in the Polar dashboard (Settings → Access Tokens).
 - `POLAR_WEBHOOK_SECRET` — only needed for the webhook recipe.
 - `POLAR_ENVIRONMENT` — `sandbox` while developing; omit it or set `production` in production. Sandbox and production are separate, so each needs its own token.
 

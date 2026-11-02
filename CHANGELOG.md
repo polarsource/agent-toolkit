@@ -3,6 +3,7 @@
 ## 0.2.1
 
 - Point access token instructions at the dashboard's new Settings → Access Tokens page in `polar-integration`, `polar-testing` and `setup-polar`.
+- Offer `polar auth token` as a way to create the access token in the same skills.
 
 ## 0.2.0
 
