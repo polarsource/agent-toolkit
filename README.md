@@ -46,14 +46,9 @@ Polar is in OpenAI's plugin directory, which ChatGPT and Codex share.
 - **Codex CLI:** run `/plugins`, search for Polar and install it, then start a new session.
 - **ChatGPT and the Codex app:** open the **Plugins** tab, search for Polar and install it.
 
-Sign in to Polar when prompted, either during install or the first time you use the plugin. The directory version connects to your live organization only; for `polar-sandbox`, install from this repository instead:
+Sign in to Polar when prompted, either during install or the first time you use the plugin. Codex uses the skills on its own when a task matches.
 
-```bash
-codex plugin marketplace add polarsource/agent-toolkit
-codex plugin add polar@polar
-```
-
-Then sign in to Polar in your browser with `codex mcp login polar` or `codex mcp login polar-sandbox`. Codex uses the skills on its own when a task matches.
+The plugin connects to your live organization. To test against the sandbox, add the `polar-sandbox` server by following the [Polar MCP guide](https://polar.sh/docs/integrate/mcp).
 
 ### Cursor
 
