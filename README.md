@@ -15,7 +15,7 @@ The skills follow the [Agent Skills](https://agentskills.io/) format, so they al
 
 | Server | URL | Use it for |
 | --- | --- | --- |
-| `polar` | `https://mcp.polar.sh/mcp/polar-mcp` | Your live Polar organization |
+| `polar` | `https://mcp.polar.sh/mcp/polar-mcp?telemetry=false` | Your live Polar organization |
 | `polar-sandbox` | `https://mcp.polar.sh/mcp/polar-sandbox` | Test data on [sandbox.polar.sh](https://sandbox.polar.sh) |
 
 Both servers use OAuth. Nothing connects until you sign in to Polar and authorize an organization.

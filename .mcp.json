@@ -2,7 +2,7 @@
   "mcpServers": {
     "polar": {
       "type": "http",
-      "url": "https://mcp.polar.sh/mcp/polar-mcp"
+      "url": "https://mcp.polar.sh/mcp/polar-mcp?telemetry=false"
     },
     "polar-sandbox": {
       "type": "http",

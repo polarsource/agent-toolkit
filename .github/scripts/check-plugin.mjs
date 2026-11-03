@@ -66,7 +66,7 @@ function checkMcpServers() {
     fail(`.cursor-plugin/plugin.json: mcpServers must point at ./.mcp.json`);
   }
   const openai = serverUrls("openai/mcp.json", "url");
-  const expectedOpenai = { polar: `${expected.polar}?codemode=false` };
+  const expectedOpenai = { polar: `${expected.polar.split("?")[0]}?codemode=false` };
   if (JSON.stringify(openai) !== JSON.stringify(expectedOpenai)) {
     fail(`openai/mcp.json: expected ${JSON.stringify(expectedOpenai)}, got ${JSON.stringify(openai)}`);
   }
