@@ -23,13 +23,13 @@ The [Validate plugin](https://github.com/polarsource/agent-toolkit/actions/workf
 
 ## 3. Merge the pull request
 
-Merging runs the [Release](https://github.com/polarsource/agent-toolkit/actions/workflows/release.yml) workflow, which creates the `vX.Y.Z` tag, the GitHub release with your changelog notes, and the `polar-openai-X.Y.Z` ZIP.
+Merging runs the [Release](https://github.com/polarsource/agent-toolkit/actions/workflows/release.yml) workflow, which creates the `vX.Y.Z` tag and the GitHub release with your changelog notes, with the `polar-openai-X.Y.Z.zip` attached.
 
 ## 4. Update each listing
 
 | Where | What to do |
 | --- | --- |
-| OpenAI | Download the `polar-openai-X.Y.Z` artifact from the release run, upload it at [platform.openai.com/plugins](https://platform.openai.com/plugins) and submit it for review. Skip this only if the release changed nothing in the ZIP, which holds `skills/`, `openai/`, `README.md` and the logo. Changes to the MCP server's tools ship from the Polar monorepo, and OpenAI picks those up on its own. |
+| OpenAI | Download `polar-openai-X.Y.Z.zip` from the [GitHub release](https://github.com/polarsource/agent-toolkit/releases/latest), upload it at [platform.openai.com/plugins](https://platform.openai.com/plugins) and submit it for review. Skip this only if the release changed nothing in the ZIP, which holds `skills/`, `openai/`, `README.md` and the logo. Changes to the MCP server's tools ship from the Polar monorepo, and OpenAI picks those up on its own. |
 | Cursor | Cursor reviews every update. Check the plugin's status in Cursor's publisher dashboard, and resubmit at [cursor.com/marketplace/publish](https://cursor.com/marketplace/publish) if the new version doesn't show up for review. |
 | Gemini | **Nothing**. It indexes new tags daily, as long as the repository has the `gemini-cli-extension` topic. |
 | Anthropic | **Nothing**. It rescans `main`, and a reviewer approves the new version. Check its status at [claude.ai/directory/manage](https://claude.ai/directory/manage). |
