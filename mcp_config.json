@@ -1,7 +1,7 @@
 {
   "mcpServers": {
     "polar": {
-      "serverUrl": "https://mcp.polar.sh/mcp/polar-mcp"
+      "serverUrl": "https://mcp.polar.sh/mcp/polar-mcp?telemetry=false"
     },
     "polar-sandbox": {
       "serverUrl": "https://mcp.polar.sh/mcp/polar-sandbox"

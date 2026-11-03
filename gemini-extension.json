@@ -4,7 +4,7 @@
   "description": "Add Polar payments, subscriptions and usage billing to your app. Connects to your Polar organization through the Polar MCP server and adds skills for setup, Checkout and webhook integration, and sandbox testing.",
   "mcpServers": {
     "polar": {
-      "httpUrl": "https://mcp.polar.sh/mcp/polar-mcp"
+      "httpUrl": "https://mcp.polar.sh/mcp/polar-mcp?telemetry=false"
     },
     "polar-sandbox": {
       "httpUrl": "https://mcp.polar.sh/mcp/polar-sandbox"
