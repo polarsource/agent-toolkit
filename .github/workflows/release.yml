@@ -56,12 +56,6 @@ jobs:
           (cd "$stage" && zip -qrX "$RUNNER_TEMP/polar-openai-$VERSION.zip" .)
           unzip -l "$RUNNER_TEMP/polar-openai-$VERSION.zip"
 
-      - uses: actions/upload-artifact@v7
-        with:
-          name: polar-openai-${{ steps.version.outputs.version }}
-          path: ${{ runner.temp }}/polar-openai-${{ steps.version.outputs.version }}.zip
-          retention-days: 30
-
       - name: Create the tag and GitHub release
         env:
           GH_TOKEN: ${{ github.token }}
@@ -72,4 +66,5 @@ jobs:
             echo "Release $TAG already exists."
             exit 0
           fi
-          gh release create "$TAG" --target "$GITHUB_SHA" --title "$TAG" --notes-file "$RUNNER_TEMP/notes.md"
+          gh release create "$TAG" --target "$GITHUB_SHA" --title "$TAG" --notes-file "$RUNNER_TEMP/notes.md" \
+            "$RUNNER_TEMP/polar-openai-$VERSION.zip"
