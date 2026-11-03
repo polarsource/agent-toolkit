@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.2.2
+
+- Update the Polar logo used by the plugins.
+
 ## 0.2.1
 
 - Point access token instructions at the dashboard's new Settings → Access Tokens page in `polar-integration`, `polar-testing` and `setup-polar`.
