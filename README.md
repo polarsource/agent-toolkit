@@ -90,7 +90,7 @@ Then connect the MCP server by following the [Polar MCP guide](https://polar.sh/
 
 ## Data and privacy
 
-The plugin contains instructions and MCP server configuration only. It runs no scripts or hooks on your machine and sends no telemetry itself. The scripts in `.github/` are for maintaining this repository, and the plugin never runs them.
+The plugin contains instructions and MCP server configuration only. It runs no scripts or hooks on your machine and sends no telemetry itself. The workflows in `.github/` maintain this repository, and the plugin never runs them.
 
 When you use the MCP servers, your agent sends requests to `mcp.polar.sh` over HTTPS. They read and change data in the Polar organization you authorized, such as products, customers, subscriptions and orders, within the permissions you granted. To disconnect, clear the server's authentication in `/mcp` in Claude Code, run `codex mcp logout <server>` in Codex, or uninstall the plugin. Polar handles this data under its [Privacy Policy](https://polar.sh/legal/privacy-policy) and [Terms of Service](https://polar.sh/legal/master-services-terms).
 

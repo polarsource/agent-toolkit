@@ -1,0 +1,425 @@
+name: Repository scripts
+description: Writes the scripts that check this repository and bump its version to $RUNNER_TEMP/scripts. CI runs them, the plugin never does.
+
+runs:
+  using: composite
+  steps:
+    - shell: bash
+      env:
+        CHECK_PLUGIN: |
+          import { isUtf8 } from "node:buffer";
+          import { execFileSync } from "node:child_process";
+          import { readdirSync, readFileSync, statSync } from "node:fs";
+          import { basename, extname, join } from "node:path";
+
+          const errors = [];
+          const fail = (message) => errors.push(message);
+          const readJson = (path) => JSON.parse(readFileSync(path, "utf8"));
+
+          const MANIFESTS = [
+            ".claude-plugin/plugin.json",
+            ".cursor-plugin/plugin.json",
+            "openai/plugin.json",
+            "gemini-extension.json",
+          ];
+          const NAMED_FILES = [...MANIFESTS, "plugin.json"];
+          const MARKETPLACES = [".claude-plugin/marketplace.json", ".cursor-plugin/marketplace.json"];
+          const IMAGE_EXTENSIONS = new Set([".png", ".jpg", ".jpeg", ".gif", ".webp", ".ico"]);
+          const TEXT_EXTENSIONS = new Set([".md", ".txt", ".json", ".yml", ".yaml"]);
+          const TEXT_NAMES = new Set(["LICENSE", ".gitignore"]);
+          const MAX_FILES = 512;
+          const MAX_FILE_BYTES = 5 * 1024 * 1024;
+          const MAX_TEXT_FILE_BYTES = 256 * 1024;
+          const PIPE_TO_SHELL = /(curl|wget)\b[^\n]*\|\s*(ba|z)?sh\b|\|\s*iex\b/;
+          const JUNK_FILES = /(^|\/)(\.DS_Store|Thumbs\.db|desktop\.ini|__MACOSX)(\/|$)/;
+          const SKILL_NAME = /^[a-z0-9]+(-[a-z0-9]+)*$/;
+          const MARKDOWN_LINK = /\]\((https?:\/\/[^)\s]+)\)|<(https?:\/\/[^>\s]+)>/g;
+
+          function checkNames() {
+            for (const path of NAMED_FILES) {
+              if (readJson(path).name !== "polar") fail(`${path}: name must be "polar"`);
+            }
+            for (const path of MARKETPLACES) {
+              const names = readJson(path).plugins.map((plugin) => plugin.name);
+              if (names.join() !== "polar") fail(`${path}: must list exactly the "polar" plugin`);
+            }
+          }
+
+          function checkVersions() {
+            const versions = Object.fromEntries(MANIFESTS.map((path) => [path, readJson(path).version]));
+            if (new Set(Object.values(versions)).size !== 1) {
+              fail(`versions differ: ${JSON.stringify(versions)}`);
+            }
+          }
+
+          function checkChangelog() {
+            const version = readJson(MANIFESTS[0]).version;
+            const sections = readFileSync("CHANGELOG.md", "utf8").match(/^## .+$/gm) ?? [];
+            if (!sections.includes(`## ${version}`)) fail(`CHANGELOG.md: no "## ${version}" section for the current version`);
+          }
+
+          function serverUrls(path, key) {
+            const servers = readJson(path).mcpServers;
+            return Object.fromEntries(Object.entries(servers).map(([name, server]) => [name, server[key]]));
+          }
+
+          function checkMcpServers() {
+            const expected = serverUrls(".mcp.json", "url");
+            const variants = {
+              "gemini-extension.json": serverUrls("gemini-extension.json", "httpUrl"),
+              "mcp_config.json": serverUrls("mcp_config.json", "serverUrl"),
+            };
+            for (const [path, servers] of Object.entries(variants)) {
+              if (JSON.stringify(servers) !== JSON.stringify(expected)) {
+                fail(`${path}: servers ${JSON.stringify(servers)} differ from .mcp.json ${JSON.stringify(expected)}`);
+              }
+            }
+            if (readJson(".cursor-plugin/plugin.json").mcpServers !== "./.mcp.json") {
+              fail(`.cursor-plugin/plugin.json: mcpServers must point at ./.mcp.json`);
+            }
+            const openai = serverUrls("openai/mcp.json", "url");
+            const expectedOpenai = { polar: `${expected.polar}?codemode=false` };
+            if (JSON.stringify(openai) !== JSON.stringify(expectedOpenai)) {
+              fail(`openai/mcp.json: expected ${JSON.stringify(expectedOpenai)}, got ${JSON.stringify(openai)}`);
+            }
+          }
+
+          function frontmatter(text) {
+            const match = text.match(/^---\n([\s\S]*?)\n---\n/);
+            if (!match) return null;
+            const fields = {};
+            const lines = match[1].split("\n");
+            for (let i = 0; i < lines.length; i++) {
+              const field = lines[i].match(/^([a-z-]+):\s*(.*)$/);
+              if (!field) continue;
+              let value = field[2].trim();
+              if (value === "|" || value === ">") {
+                const block = [];
+                while (i + 1 < lines.length && /^\s+\S/.test(lines[i + 1])) block.push(lines[++i].trim());
+                value = block.join(" ");
+              }
+              fields[field[1]] = value.replace(/^["']|["']$/g, "");
+            }
+            return fields;
+          }
+
+          function checkSkills() {
+            for (const directory of readdirSync("skills")) {
+              const path = join("skills", directory, "SKILL.md");
+              const fields = frontmatter(readFileSync(path, "utf8"));
+              if (!fields) {
+                fail(`${path}: missing frontmatter`);
+                continue;
+              }
+              if (fields.name !== directory) fail(`${path}: name "${fields.name}" must match its folder`);
+              if (!SKILL_NAME.test(directory) || directory.length > 64) {
+                fail(`${path}: folder name must be lowercase kebab-case, at most 64 characters`);
+              }
+              const length = fields.description?.length ?? 0;
+              if (length < 1 || length > 1024) fail(`${path}: description must be 1-1024 characters, is ${length}`);
+            }
+          }
+
+          function checkFiles() {
+            const files = execFileSync("git", ["ls-files", "-s"], { encoding: "utf8" })
+              .trim()
+              .split("\n")
+              .map((line) => line.match(/^(\d+) \S+ \d+\t(.+)$/));
+            if (files.length > MAX_FILES) fail(`${files.length} files, the directory limit is ${MAX_FILES}`);
+            for (const [, mode, path] of files) {
+              if (mode === "120000") fail(`${path}: symlinks are not allowed`);
+              if (mode === "160000") fail(`${path}: submodules are not allowed`);
+              if (JUNK_FILES.test(path)) fail(`${path}: remove OS junk files`);
+              if (mode !== "100644" && mode !== "100755") continue;
+              const size = statSync(path).size;
+              const extension = extname(path).toLowerCase();
+              const image = IMAGE_EXTENSIONS.has(extension);
+              if (!image && !TEXT_EXTENSIONS.has(extension) && !TEXT_NAMES.has(basename(path))) {
+                fail(`${path}: the Claude directory only accepts Markdown, text, JSON, YAML and PNG, JPEG, GIF, WebP or ICO files`);
+              }
+              if (size > MAX_FILE_BYTES) fail(`${path}: ${size} bytes, the limit is ${MAX_FILE_BYTES}`);
+              if (image) continue;
+              if (size > MAX_TEXT_FILE_BYTES) fail(`${path}: ${size} bytes, the limit for non-images is ${MAX_TEXT_FILE_BYTES}`);
+              const bytes = readFileSync(path);
+              if (!isUtf8(bytes) || bytes.includes(0)) fail(`${path}: text files must be UTF-8 with no NUL bytes`);
+              const text = bytes.toString("utf8");
+              if (text.startsWith("#!")) fail(`${path}: the Claude directory refuses files that start with #!`);
+              if (PIPE_TO_SHELL.test(text)) fail(`${path}: pipes a download into a shell, which plugin scanners flag`);
+            }
+          }
+
+          function codeSnippets(text) {
+            const snippets = [];
+            let fenced = false;
+            for (const line of text.split("\n")) {
+              if (line.trimStart().startsWith("```")) {
+                fenced = !fenced;
+                continue;
+              }
+              if (fenced) snippets.push(line);
+              else for (const [, code] of line.matchAll(/`([^`\n]+)`/g)) snippets.push(code);
+            }
+            return snippets;
+          }
+
+          function documents() {
+            return ["README.md", ...readdirSync("skills").map((directory) => join("skills", directory, "SKILL.md"))];
+          }
+
+          function cliCommands() {
+            const commands = new Map();
+            for (const document of documents()) {
+              for (const snippet of codeSnippets(readFileSync(document, "utf8"))) {
+                for (const [, rest] of snippet.matchAll(/(?:^|[\s($])polar ([^#|;&>)]*)/g)) {
+                  const tokens = rest.trim().split(/\s+/);
+                  const path = [];
+                  for (const token of tokens) {
+                    if (path.length === 2 || !/^[a-z][a-z-]*$/.test(token)) break;
+                    path.push(token);
+                  }
+                  if (path.length === 0) continue;
+                  const command = path.join(" ");
+                  const flags = commands.get(command) ?? new Set();
+                  for (const token of tokens) if (token.startsWith("--")) flags.add(token.split("=")[0]);
+                  commands.set(command, flags);
+                }
+              }
+            }
+            return commands;
+          }
+
+          function checkCli(binary) {
+            for (const [command, flags] of cliCommands()) {
+              const help = execFileSync(binary, [...command.split(" "), "--help"], { encoding: "utf8" });
+              if (!new RegExp(`USAGE\\s+polar ${command}\\b`).test(help)) {
+                fail(`polar ${command}: no such command in the published CLI`);
+                continue;
+              }
+              for (const flag of flags) {
+                if (!new RegExp(`${flag}\\b`).test(help)) fail(`polar ${command}: no ${flag} flag in the published CLI`);
+              }
+              console.log(`polar ${command} ${[...flags].join(" ")}`.trim());
+            }
+          }
+
+          function linkStatus(url) {
+            return fetch(url, { signal: AbortSignal.timeout(20_000) }).then(
+              (response) => (response.ok ? null : `HTTP ${response.status}`),
+              (error) => error.cause?.code ?? error.message,
+            );
+          }
+
+          async function checkLinks() {
+            const links = new Map();
+            for (const document of documents()) {
+              for (const [, markdownUrl, autolinkUrl] of readFileSync(document, "utf8").matchAll(MARKDOWN_LINK)) {
+                const url = (markdownUrl ?? autolinkUrl).split("#")[0];
+                links.set(url, [...new Set([...(links.get(url) ?? []), document])]);
+              }
+            }
+            await Promise.all(
+              [...links].map(async ([url, linkedFrom]) => {
+                const status = (await linkStatus(url)) && (await linkStatus(url));
+                if (status) fail(`${url} (${linkedFrom.join(", ")}): ${status}`);
+                else console.log(url);
+              }),
+            );
+          }
+
+          const cliFlag = process.argv.indexOf("--cli");
+          if (process.argv.includes("--links")) {
+            await checkLinks();
+          } else if (cliFlag === -1) {
+            checkNames();
+            checkVersions();
+            checkChangelog();
+            checkMcpServers();
+            checkSkills();
+            checkFiles();
+          } else {
+            checkCli(process.argv[cliFlag + 1]);
+          }
+
+          if (errors.length > 0) {
+            console.error(errors.map((error) => `✘ ${error}`).join("\n"));
+            process.exit(1);
+          }
+          console.log("✔ Plugin checks passed");
+        CHECK_SAMPLES: |
+          import { execFileSync, spawnSync } from "node:child_process";
+          import { mkdtempSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
+          import { tmpdir } from "node:os";
+          import { join } from "node:path";
+
+          const SDK_VERSION = process.env.POLAR_SDK_VERSION || "latest";
+          const DEPENDENCIES = [`@polar-sh/sdk@${SDK_VERSION}`, "typescript@5.9.3", "vitest@3.2.4", "@types/node@24"];
+          const FENCE_START = /^(\s*)```(ts|typescript)\s*$/;
+          const FENCE_END = /^\s*```\s*$/;
+          const USES_SDK = /@polar-sh\/sdk|\bpolar\.|\bevent\./;
+          const ELIDED = /^\s*\/\/ \.\.\./m;
+          const CLIENT = /^export const polar\b/m;
+          const WEBHOOK_CASE = /^case /;
+          const TSC_ERROR = /^(.+?)\((\d+),(\d+)\): error (TS\d+): (.*)$/;
+          const MISSING_RELATIVE_MODULE = /^Cannot find module '\.\.?\//;
+          const CLIENT_DECLARATION = `declare const polar: typeof import("./polar").polar;\n`;
+          const PRELUDE = `declare function getUserId(request: Request): Promise<string | undefined>;
+          declare function recordMigratedSubscription(ids: { stripeSubscriptionId: string; polarSubscriptionId: string }): Promise<void>;
+          declare const polarCustomerId: string;
+          declare const appCustomerId: string;
+          declare const productId: string;
+          declare const email: string;
+          declare const name: string;
+          `;
+          const TSCONFIG = {
+            compilerOptions: {
+              target: "es2023",
+              lib: ["es2023"],
+              module: "preserve",
+              moduleResolution: "bundler",
+              moduleDetection: "force",
+              resolveJsonModule: true,
+              strict: true,
+              noEmit: true,
+              skipLibCheck: true,
+              types: ["node"],
+            },
+            include: ["*.ts"],
+          };
+
+          function codeBlocks(path) {
+            const blocks = [];
+            let block = null;
+            readFileSync(path, "utf8")
+              .split("\n")
+              .forEach((line, index) => {
+                if (!block) {
+                  const start = line.match(FENCE_START);
+                  if (start) block = { path, line: index + 1, indent: start[1].length, lines: [] };
+                } else if (FENCE_END.test(line)) {
+                  blocks.push({ ...block, code: block.lines.join("\n") });
+                  block = null;
+                } else {
+                  block.lines.push(line.slice(block.indent));
+                }
+              });
+            return blocks;
+          }
+
+          const documents = readdirSync("skills").map((skill) => join("skills", skill, "SKILL.md"));
+          const blocks = documents.flatMap(codeBlocks);
+          const checked = blocks.filter((block) => USES_SDK.test(block.code) && !ELIDED.test(block.code));
+          const client = checked.find((block) => CLIENT.test(block.code));
+          const sdkModule = client?.code.match(/"(@polar-sh\/sdk[^"]*)"/)?.[1];
+          const compiled = checked.filter((block) => sdkModule || !WEBHOOK_CASE.test(block.code));
+
+          const directory = mkdtempSync(join(tmpdir(), "polar-samples-"));
+          const files = new Map();
+          for (const block of compiled) {
+            const file = block === client ? "polar.ts" : `${block.path.split("/")[1]}-${block.line}.ts`;
+            const prefix = WEBHOOK_CASE.test(block.code)
+              ? [`import { webhooks } from "${sdkModule}";`, "export async function handle(event: webhooks.WebhookPayload) {", "switch (event.type) {"]
+              : [];
+            const suffix = prefix.length > 0 ? ["}", "}"] : [];
+            files.set(file, { ...block, offset: prefix.length });
+            writeFileSync(join(directory, file), [...prefix, block.code, ...suffix, ""].join("\n"));
+          }
+          writeFileSync(join(directory, "prelude.d.ts"), (client ? CLIENT_DECLARATION : "") + PRELUDE);
+          writeFileSync(join(directory, "tsconfig.json"), JSON.stringify(TSCONFIG));
+
+          execFileSync("npm", ["install", "--ignore-scripts", "--no-audit", "--no-fund", "--loglevel=error", ...DEPENDENCIES], {
+            cwd: directory,
+            stdio: "inherit",
+          });
+          const sdk = JSON.parse(readFileSync(join(directory, "node_modules/@polar-sh/sdk/package.json"), "utf8"));
+          console.log(`Type-checking ${compiled.length} of ${blocks.length} TypeScript samples against @polar-sh/sdk ${sdk.version}`);
+
+          const tsc = spawnSync(process.execPath, ["node_modules/typescript/bin/tsc", "--pretty", "false"], {
+            cwd: directory,
+            encoding: "utf8",
+          });
+          const errors = tsc.stderr ? [{ location: "tsc", message: tsc.stderr.trim() }] : [];
+          if (!client) errors.push({ location: "skills", message: "No TypeScript sample exports the `polar` client that the other samples import" });
+          for (const output of tsc.stdout.split("\n")) {
+            if (!output.includes("error TS")) continue;
+            const match = output.match(TSC_ERROR);
+            const block = match && files.get(match[1]);
+            if (!block) {
+              errors.push({ location: "tsc", message: output });
+              continue;
+            }
+            const [, , line, column, code, message] = match;
+            if (code === "TS2307" && MISSING_RELATIVE_MODULE.test(message)) continue;
+            const documentLine = block.line + Number(line) - block.offset;
+            errors.push({
+              location: `${block.path}:${documentLine}:${Number(column) + block.indent}`,
+              message: `${code} ${message}`,
+              annotation: `file=${block.path},line=${documentLine}`,
+            });
+          }
+
+          if (errors.length > 0) {
+            for (const { location, message, annotation } of errors) {
+              console.error(`✘ ${location} ${message}`);
+              if (process.env.GITHUB_ACTIONS && annotation) console.log(`::error ${annotation}::${message}`);
+            }
+            process.exit(1);
+          }
+          console.log("✔ TypeScript samples compile");
+        BUMP_VERSION: |
+          import { readFileSync, writeFileSync } from "node:fs";
+
+          const MANIFESTS = [
+            ".claude-plugin/plugin.json",
+            ".cursor-plugin/plugin.json",
+            "openai/plugin.json",
+            "gemini-extension.json",
+          ];
+          const VERSION = /^(\d+)\.(\d+)\.(\d+)$/;
+          const USAGE = 'Usage: node bump-version.mjs <patch|minor|major|X.Y.Z> "<change>" ["<change>" ...]';
+
+          function exit(message) {
+            console.error(`${message}\n${USAGE}`);
+            process.exit(1);
+          }
+
+          function nextVersion(current, bump) {
+            const [, major, minor, patch] = current.match(VERSION).map(Number);
+            if (bump === "patch") return `${major}.${minor}.${patch + 1}`;
+            if (bump === "minor") return `${major}.${minor + 1}.0`;
+            if (bump === "major") return `${major + 1}.0.0`;
+            if (!VERSION.test(bump)) exit(`"${bump}" is not patch, minor, major or an X.Y.Z version.`);
+            return bump;
+          }
+
+          function isNewer(candidate, current) {
+            const [a, b] = [candidate, current].map((version) => version.match(VERSION).slice(1).map(Number));
+            const index = a.findIndex((part, i) => part !== b[i]);
+            return index !== -1 && a[index] > b[index];
+          }
+
+          const [bump, ...changes] = process.argv.slice(2);
+          if (!bump) exit("Missing the version to bump to.");
+          if (changes.length === 0) exit("Describe at least one change for the changelog.");
+
+          const current = JSON.parse(readFileSync(MANIFESTS[0], "utf8")).version;
+          const version = nextVersion(current, bump);
+          if (!isNewer(version, current)) exit(`${version} must be newer than the current version, ${current}.`);
+
+          const changelog = readFileSync("CHANGELOG.md", "utf8");
+          if (changelog.includes(`\n## ${version}\n`)) exit(`CHANGELOG.md already has a ${version} section.`);
+          if (!changelog.startsWith("# Changelog\n\n")) exit('CHANGELOG.md must start with a "# Changelog" heading.');
+
+          for (const path of MANIFESTS) {
+            const manifest = readFileSync(path, "utf8");
+            writeFileSync(path, manifest.replace(/"version": "[^"]+"/, `"version": "${version}"`));
+          }
+
+          const section = `## ${version}\n\n${changes.map((change) => `- ${change}`).join("\n")}\n\n`;
+          writeFileSync("CHANGELOG.md", changelog.replace("# Changelog\n\n", `# Changelog\n\n${section}`));
+
+          console.log(`Bumped ${current} → ${version} in ${MANIFESTS.join(", ")} and added it to CHANGELOG.md.`);
+      run: |
+        mkdir -p "$RUNNER_TEMP/scripts"
+        printf '%s' "$CHECK_PLUGIN" > "$RUNNER_TEMP/scripts/check-plugin.mjs"
+        printf '%s' "$CHECK_SAMPLES" > "$RUNNER_TEMP/scripts/check-samples.mjs"
+        printf '%s' "$BUMP_VERSION" > "$RUNNER_TEMP/scripts/bump-version.mjs"
