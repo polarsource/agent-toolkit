@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.2.3
+
+- polar-migration: Stripe migrations are now open to every organization that is ready to sell, so the skill no longer says they are rolling out gradually.
+
 ## 0.2.2
 
 - Update the Polar logo used by the plugins.
