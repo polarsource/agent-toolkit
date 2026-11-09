@@ -48,6 +48,7 @@ jobs:
       - uses: actions/setup-node@v7.1.0
         with:
           node-version: 24
+      - uses: ./toolkit/.github/actions/scripts
       - run: npm install -g @polar-sh/cli
 
       - name: Start from the open drift pull request or main
@@ -77,9 +78,9 @@ jobs:
 
           failed=false
           for args in "" "--cli $(command -v polar)" "--links"; do
-            node .github/scripts/check-plugin.mjs $args >> "$RUNNER_TEMP/checks.txt" 2>&1 || failed=true
+            node "$RUNNER_TEMP/scripts/check-plugin.mjs" $args >> "$RUNNER_TEMP/checks.txt" 2>&1 || failed=true
           done
-          node .github/scripts/check-samples.mjs >> "$RUNNER_TEMP/checks.txt" 2>&1 || failed=true
+          node "$RUNNER_TEMP/scripts/check-samples.mjs" >> "$RUNNER_TEMP/checks.txt" 2>&1 || failed=true
           cat "$RUNNER_TEMP/checks.txt"
 
           {
@@ -89,6 +90,7 @@ jobs:
             echo
             echo "- Monorepo commit: $(git -C ../polar rev-parse HEAD)"
             echo "- Polar CLI path: $(command -v polar)"
+            echo "- Scripts: $RUNNER_TEMP/scripts"
             if [ -n "$PR" ]; then
               echo "- Pull request #$PR is open and already bumps the version, so add your lines to the top section of \`CHANGELOG.md\`."
             else
@@ -135,9 +137,9 @@ jobs:
             --permission-mode dontAsk \
             --add-dir ../polar \
             --allowedTools Read Glob Grep Edit Write \
-              "Bash(node .github/scripts/check-plugin.mjs:*)" \
-              "Bash(node .github/scripts/check-samples.mjs:*)" \
-              "Bash(node .github/scripts/bump-version.mjs:*)" \
+              "Bash(node $RUNNER_TEMP/scripts/check-plugin.mjs:*)" \
+              "Bash(node $RUNNER_TEMP/scripts/check-samples.mjs:*)" \
+              "Bash(node $RUNNER_TEMP/scripts/bump-version.mjs:*)" \
               "Bash(git -C ../polar show:*)" \
               "Bash(git -C ../polar log:*)" \
               "Bash(git -C ../polar diff:*)" \
@@ -171,10 +173,10 @@ jobs:
             exit 1
           fi
 
-          node .github/scripts/check-plugin.mjs
-          node .github/scripts/check-samples.mjs
-          node .github/scripts/check-plugin.mjs --cli "$(command -v polar)"
-          node .github/scripts/check-plugin.mjs --links
+          node "$RUNNER_TEMP/scripts/check-plugin.mjs"
+          node "$RUNNER_TEMP/scripts/check-samples.mjs"
+          node "$RUNNER_TEMP/scripts/check-plugin.mjs" --cli "$(command -v polar)"
+          node "$RUNNER_TEMP/scripts/check-plugin.mjs" --links
           if [ "$(jq -r .version .claude-plugin/plugin.json)" = "$(git show origin/main:.claude-plugin/plugin.json | jq -r .version)" ]; then
             echo "::error::The version wasn't bumped"
             exit 1
