@@ -24,7 +24,14 @@ First, check if the Polar MCP server is available by listing organizations: call
 
 **Polar plugin installed:** the plugin already configures the Polar server (`polar`, plus `polar-sandbox` where available). Ask the user to sign in to it, preferring `polar-sandbox`: in Claude Code with `/mcp`, in Codex with `codex mcp login <server>`, in Cursor or Antigravity from their MCP settings, in Gemini CLI with `/mcp auth <server>`, and in ChatGPT when prompted to connect. Then continue with the verification below.
 
-Otherwise, guide the user to install the Polar MCP server based on their environment:
+Otherwise, the recommended way in Claude Code, Codex and Cursor is the Polar CLI, which installs the Polar plugin (or, in Cursor, the MCP servers and skills) for the agent it runs in:
+
+```bash
+npm install -g @polar-sh/cli
+polar agent setup
+```
+
+`polar agent setup --status` shows what is set up. To connect the MCP server by hand instead, or in other clients, guide the user based on their environment:
 
 **Claude Code:**
 ```bash

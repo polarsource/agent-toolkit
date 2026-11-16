@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.2.3
+
+- polar-migration: Stripe migrations are now open to every organization that is ready to sell, so the skill no longer says they are rolling out gradually.
+- setup-polar: recommend `polar agent setup` from the Polar CLI to install the Polar plugin or MCP servers in Claude Code, Codex and Cursor before falling back to connecting the MCP server by hand.
+
 ## 0.2.2
 
 - Update the Polar logo used by the plugins.

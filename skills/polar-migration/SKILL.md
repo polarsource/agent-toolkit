@@ -10,7 +10,7 @@ description: |
 
 ## Pick the path
 
-- **From Stripe:** use Polar's assisted migration under **Settings → Migrations**. Polar imports products, prices and customers, Stripe copies saved cards straight to Polar's payment processor, and Polar switches each subscription over with the same paid period. Most customers don't need to do anything. Migrations are rolling out gradually; if the tab is missing, contact [Polar support](https://polar.sh/docs/support).
+- **From Stripe:** use Polar's assisted migration under **Settings → Migrations**. Polar imports products, prices and customers, Stripe copies saved cards straight to Polar's payment processor, and Polar switches each subscription over with the same paid period. Most customers don't need to do anything. The organization must be ready to sell before it can start a migration.
 - **From Paddle, Lemon Squeezy or anything else:** there's no automated migration. Contact Polar support first, then follow "Other providers" below. Customers move by checking out again on Polar.
 
 ## Rules for every migration
