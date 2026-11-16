@@ -4,18 +4,10 @@ Every release gets a version number, a changelog entry, a `vX.Y.Z` tag and a Git
 
 ## 1. Bump the version and add a changelog entry
 
-On a new branch from `main`, run:
+On a new branch from `main`:
 
-```bash
-node .github/scripts/bump-version.mjs patch 'Change 1' 'Change 2'
-```
-
-Use `patch`, `minor` or `major`, or an exact version such as `0.2.0`. Each quoted argument becomes one bullet. Use single quotes so backticks stay literal.
-
-The script does the following:
-
-* Sets the version in all four manifests (`.claude-plugin/plugin.json`, `.cursor-plugin/plugin.json`, `openai/plugin.json` and `gemini-extension.json`)
-* Adds a section for it at the top of `CHANGELOG.md`. That section becomes the release notes on GitHub and in the OpenAI ZIP, so write it for people who use the plugin. You can still edit it before committing.
+* Set the new version in all four manifests: `.claude-plugin/plugin.json`, `.cursor-plugin/plugin.json`, `openai/plugin.json` and `gemini-extension.json`.
+* Add a `## X.Y.Z` section at the top of `CHANGELOG.md` with one bullet per change. That section becomes the release notes on GitHub and in the OpenAI ZIP, so write it for people who use the plugin.
 
 ## 2. Open the pull request
 
@@ -43,3 +35,11 @@ Record the test cases in the Codex app with the release ZIP installed, signed in
 ## Changing the MCP server URLs
 
 Each agent reads the servers from a different file, so update all four: `.mcp.json`, `gemini-extension.json`, `mcp_config.json` and `openai/mcp.json`. The plugin checks fail if they disagree.
+
+## Repository scripts
+
+The scripts CI runs (`check-plugin.mjs`, `check-samples.mjs` and `bump-version.mjs`) are embedded in `.github/actions/scripts/action.yml` instead of kept as `.mjs` files, so the repository only holds file types the Claude directory accepts. To run one locally, extract it by its `env` name first:
+
+```bash
+ruby -ryaml -e 'print YAML.load_file(".github/actions/scripts/action.yml").dig("runs", "steps", 0, "env", "CHECK_PLUGIN")' > /tmp/check-plugin.mjs && node /tmp/check-plugin.mjs
+```

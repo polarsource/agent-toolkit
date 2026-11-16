@@ -18,7 +18,8 @@ jobs:
       - uses: actions/setup-node@v7.1.0
         with:
           node-version: 24
-      - run: node .github/scripts/check-plugin.mjs
+      - uses: ./.github/actions/scripts
+      - run: node "$RUNNER_TEMP/scripts/check-plugin.mjs"
 
   cli:
     name: Polar CLI commands in docs
@@ -31,7 +32,8 @@ jobs:
         with:
           node-version: 24
       - run: npm install -g @polar-sh/cli
-      - run: node .github/scripts/check-plugin.mjs --cli "$(command -v polar)"
+      - uses: ./.github/actions/scripts
+      - run: node "$RUNNER_TEMP/scripts/check-plugin.mjs" --cli "$(command -v polar)"
 
   samples:
     name: TypeScript samples against the published SDK
@@ -41,7 +43,8 @@ jobs:
       - uses: actions/setup-node@v7.1.0
         with:
           node-version: 24
-      - run: node .github/scripts/check-samples.mjs
+      - uses: ./.github/actions/scripts
+      - run: node "$RUNNER_TEMP/scripts/check-samples.mjs"
 
   links:
     name: Links in docs
@@ -51,7 +54,8 @@ jobs:
       - uses: actions/setup-node@v7.1.0
         with:
           node-version: 24
-      - run: node .github/scripts/check-plugin.mjs --links
+      - uses: ./.github/actions/scripts
+      - run: node "$RUNNER_TEMP/scripts/check-plugin.mjs" --links
 
   claude:
     name: Claude Code

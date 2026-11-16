@@ -23,7 +23,8 @@ jobs:
       - uses: actions/setup-node@v7.1.0
         with:
           node-version: 24
-      - run: node .github/scripts/check-plugin.mjs
+      - uses: ./.github/actions/scripts
+      - run: node "$RUNNER_TEMP/scripts/check-plugin.mjs"
 
       - id: version
         run: |
