@@ -6,12 +6,12 @@ Every release gets a version number, a changelog entry, a `vX.Y.Z` tag and a Git
 
 On a new branch from `main`:
 
-* Set the new version in all four manifests: `.claude-plugin/plugin.json`, `.cursor-plugin/plugin.json`, `openai/plugin.json` and `gemini-extension.json`.
+* Set the new version in all five manifests: `.claude-plugin/plugin.json`, `.cursor-plugin/plugin.json`, `openai/plugin.json`, `gemini-extension.json` and `plugin.json`.
 * Add a `## X.Y.Z` section at the top of `CHANGELOG.md` with one bullet per change. That section becomes the release notes on GitHub and in the OpenAI ZIP, so write it for people who use the plugin.
 
 ## 2. Open the pull request
 
-The [Validate plugin](https://github.com/polarsource/agent-toolkit/actions/workflows/validate.yml) workflow checks that the four versions match and that `CHANGELOG.md` has a section for the new version. It also installs and validates the plugin.
+The [Validate plugin](https://github.com/polarsource/agent-toolkit/actions/workflows/validate.yml) workflow checks that the five versions match and that `CHANGELOG.md` has a section for the new version. It also installs and validates the plugin.
 
 ## 3. Merge the pull request
 
