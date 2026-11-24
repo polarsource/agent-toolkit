@@ -23,11 +23,13 @@ You do the engineering: write the file, run the commands, fix what they report. 
 - `polar config init`, `apply`, `publish` and `disable` change the organization. Run each only after the user has said yes to what it will do.
 - Work in sandbox until the user asks for production.
 
-## Step 1: Find the config
+## Step 1: Run init first
 
-Look for `polar.config.ts`, `polar_config.py` or `polar.config.json` in the project. If there is one, go to Step 2.
+`polar config init` comes before any config you write, even for a new or empty organization. It is the only command that turns on config for the organization, and `plan`, `apply` and `publish` refuse until it has run. Don't write the file by hand first.
 
-If there is none, `polar config init` writes it from the organization's existing meters, benefits and products. Tell the user what it does and wait for a yes:
+Look for `polar.config.ts`, `polar_config.py` or `polar.config.json` in the project. If there is one, go to Step 2. If `plan` then says config is not enabled for the organization, move the file aside, run `init`, and bring your entries over into the file `init` wrote.
+
+If there is none, `polar config init` writes it from the organization's existing meters, benefits and products. For a new organization the file holds only settings: add the meters, benefits and products to it in Step 2. Tell the user what `init` does and wait for a yes:
 
 - It turns on config for the organization. From then on products and benefits are edited in the file, not in the dashboard. `polar config disable` undoes this, but only until a second catalog version is published.
 - Existing meters, benefits and products without an external ID get one. The config refers to them by that ID from then on.
