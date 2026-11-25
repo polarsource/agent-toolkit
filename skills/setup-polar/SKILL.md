@@ -38,29 +38,17 @@ First, check if the Polar MCP server is available by listing organizations: call
 
 **Polar plugin installed:** the plugin already configures the Polar server (`polar`, plus `polar-sandbox` where available). Ask the user to sign in to it, preferring `polar-sandbox`: in Claude Code with `/mcp`, in Codex with `codex mcp login <server>`, in Cursor or Antigravity from their MCP settings, in Gemini CLI with `/mcp auth <server>`, and in ChatGPT when prompted to connect. Then continue with the verification below.
 
-Otherwise, guide the user to install the Polar MCP server based on their environment:
+Otherwise, set it up with the Polar CLI. Install it with `npm install -g @polar-sh/cli`, then run:
 
-**Claude Code:**
 ```bash
-# Production
-claude mcp add --transport http polar https://mcp.polar.sh/mcp/polar-mcp
-
-# Sandbox (recommended for setup)
-claude mcp add --transport http polar-sandbox https://mcp.polar.sh/mcp/polar-sandbox
+polar agent setup
 ```
 
-**Cursor** (`.cursor/mcp.json`):
-```json
-{
-  "mcpServers": {
-    "polar-sandbox": {
-      "url": "https://mcp.polar.sh/mcp/polar-sandbox"
-    }
-  }
-}
-```
+It installs the Polar plugin, with the MCP server and these skills, for Claude Code, Codex and Cursor. Run from inside one of them, it sets up only that agent and asks nothing. `polar agent setup --status` shows what is set up without changing anything.
 
-For other clients, follow the [Polar MCP guide](https://polar.sh/docs/integrate/mcp). After installing, the user restarts their editor or CLI and signs in when prompted (in Claude Code, run `/mcp` and authenticate). The sandbox server signs in at sandbox.polar.sh and the production server at polar.sh.
+For any other agent, connect the MCP server by following the [Polar MCP guide](https://polar.sh/docs/integrate/mcp).
+
+The user then signs in, preferring `polar-sandbox` where it is available: in Claude Code after a restart with `/mcp`, in Codex with `codex mcp login <server>`, and in Cursor from its MCP settings. The sandbox server signs in at sandbox.polar.sh and the production server at polar.sh.
 
 Once authenticated, verify MCP works by listing organizations.
 
@@ -141,7 +129,7 @@ When deploying, create a webhook endpoint for the public URL in the dashboard (S
 ### Step 8: Test the Integration
 
 1. Visit the checkout URL with the product ID from Step 5 (path and query shape come from the route generated in Step 6).
-2. Complete checkout using test card: `4242 4242 4242 4242`.
+2. Complete checkout using test card `4242 4242 4242 4242` and an email address on a real domain. Polar rejects `@example.com` and other addresses that can't receive mail.
 3. Verify that `polar webhook listen` shows `order.paid` with a 2xx status from the handler.
 4. Check the success page displays correctly.
 
