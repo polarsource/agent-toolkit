@@ -15,7 +15,7 @@ Ask these three questions before anything else, and wait for the answers.
 **1. Which organization?**
 
 - **I already have one.** Continue with Step 1. The user signs in and picks it in Step 4.
-- **Create one for me.** Polar supports the [auth.md](https://polar.sh/auth.md) spec: you sign up on your own, create the organization and its products, and hand it over to the user with a claim. Read <https://sandbox.polar.sh/auth.md> for sandbox or <https://polar.sh/auth.md> for production, and follow it. Skip Steps 1, 2 and 4, and create the product in Step 5 through the API with your access token. Start the claim before Step 6: the app's access token and the webhooks need it. When you start it, put the full `verification_uri` and the `user_code` in your reply to the user, copied exactly. Tool and command output is often collapsed or hidden, so the link only reaches the user if you write it in your message, and they can't claim the organization without it.
+- **Create one for me.** Polar supports the [auth.md](https://polar.sh/auth.md) spec: you sign up on your own, create the organization and its products, and hand it over to the user with a claim. Read <https://sandbox.polar.sh/auth.md> for sandbox or <https://polar.sh/auth.md> for production, and follow it. Ask what to call the organization, then create it with `POST /v1/organizations/` (a `name` and a `slug`); if the slug is taken, pick another and say which. Skip Steps 1, 2 and 4. In Step 5, create the product through the API with your access token, or in the config file if that is what the user chooses below. Start the claim before Step 6: the app's access token and the webhooks need it. To start it, ask the user for the email address they will sign in to Polar with. Keep working on what doesn't need the claim while you poll for it, and once it succeeds use the access token it returns, because the one you had stops working. When you start the claim, put the full `verification_uri` and the `user_code` in your reply to the user, copied exactly. Tool and command output is often collapsed or hidden, so the link only reaches the user if you write it in your message, and they can't claim the organization without it.
 - **I'll create it myself.** Send them to <https://sandbox.polar.sh/start> for sandbox or <https://polar.sh/start> for production, and continue with Step 1 once they have it.
 
 **2. Sandbox or production?**
@@ -27,7 +27,7 @@ Suggest sandbox. It is a separate copy of Polar where checkout takes test cards,
 There are two ways to manage products, prices and benefits, and the user chooses. If the project already has a `polar.config.ts` or `polar.config.json`, it uses a config file: don't ask.
 
 - **Dashboard.** Products are created and edited in the Polar dashboard, or by you through the API. Product IDs never change. This is how every organization starts, and it is what the steps below follow.
-- **Config file.** The catalog lives in a file in the repository. A pricing change is reviewed like any other code change and applied with the Polar CLI. Once it is turned on, products are edited in the file and no longer in the dashboard.
+- **Config file.** The catalog lives in a file in the repository. A pricing change is reviewed like any other code change, then drafted and published with the Polar CLI. Once it is turned on, products are edited in the file and no longer in the dashboard.
 
 For a config file, use the `polar-config` skill in place of Step 5, and refer to products by their external ID from then on.
 
@@ -74,7 +74,7 @@ Ask the user:
    - One-time purchase
    - Both
 
-From here on, work in the environment chosen at the start: use the `polar-sandbox` server's tools for sandbox and the `polar` server's tools for production. If only `polar` is available (as in ChatGPT), create sandbox products in the sandbox dashboard or with the Polar CLI instead.
+From here on, work in the environment chosen at the start: use the `polar-sandbox` server's tools for sandbox and the `polar` server's tools for production. With an organization you created yourself, keep calling the API with your access token instead. If only `polar` is available (as in ChatGPT), create sandbox products in the sandbox dashboard or with the Polar CLI instead.
 
 ### Step 4: Choose the Organization
 
@@ -120,7 +120,9 @@ polar auth login --sandbox
 token=$(polar auth token --scope checkouts:write --scope customer_sessions:write) && echo "POLAR_ACCESS_TOKEN=$token" >> .env
 ```
 
-`polar auth token` opens the token page in a browser with those scopes preselected, waits for the user to create the token, and prints it, so this saves it to `.env` without showing it. The token belongs to the active organization and its environment: `polar auth whoami --json` shows which one that is, and `polar auth org` changes it.
+`polar auth token` opens the token page in a browser with those scopes preselected, waits for the user to create the token, and prints it, so this saves it to `.env` without showing it. Add `--scope events:write` when the app sends usage events, `--scope customer_meters:read` when it reads a customer's balance and `--scope benefits:read` when it checks benefit grants.
+
+If you created the organization yourself, do this after the claim and run it yourself, with your access token in place of a login: `POLAR_ACCESS_TOKEN=<access token> POLAR_ENVIRONMENT=sandbox polar auth token --scope ...`. Give the user the link it prints to approve in their browser. The token belongs to the active organization and its environment: `polar auth whoami --json` shows which one that is, and `polar auth org` changes it.
 
 Without the CLI, create the token in the sandbox or production dashboard: Settings → Access Tokens → Create token.
 
@@ -150,4 +152,4 @@ Once basic setup works, suggest:
 
 1. **Link to your auth** - Pass `external_customer_id` from the logged-in user when creating checkouts.
 2. **Add benefits** - License keys, file downloads, Discord roles.
-3. **Go production** - Production is separate from sandbox: set up the organization at polar.sh, re-create the product (it gets a new ID; with a config file, apply and publish the same file there instead, and the external IDs stay the same), create a production access token and webhook endpoint, and set `POLAR_ENVIRONMENT=production`. Then submit the organization for review in the dashboard; checkouts are blocked until it can accept payments.
+3. **Go production** - Production is separate from sandbox: set up the organization at polar.sh, re-create the product (it gets a new ID; with a config file, draft and publish the same file there instead, and the external IDs stay the same), create a production access token and webhook endpoint, and set `POLAR_ENVIRONMENT=production`. Then submit the organization for review in the dashboard; checkouts are blocked until it can accept payments.

@@ -1,12 +1,12 @@
 ---
 name: polar-config
 description: |
-  Manage a Polar catalog as code with a billing config file (polar.config.ts or polar.config.json) and the "polar config" commands of the Polar CLI. Use this skill whenever the user wants to: (1) create or edit a Polar billing config; (2) add or change meters, benefits, products or prices in it; (3) write the config from their app's pricing; (4) preview or apply it with polar config plan, apply or publish; (5) fix an issue those commands report; (6) retire a meter, benefit or product with deprecated and polar config prune; (7) generate the config's names for application code with polar config generate.
+  Manage a Polar catalog as code with a billing config file (polar.config.ts or polar.config.json) and the "polar config" commands of the Polar CLI. Use this skill whenever the user wants to: (1) create or edit a Polar billing config; (2) add or change meters, benefits, products or prices in it; (3) write the config from their app's pricing; (4) check what would change, save it to the draft or publish it with polar config validate, draft or publish; (5) fix an issue those commands report; (6) retire a meter, benefit or product with deprecated and polar config prune; (7) generate the config's names for application code with polar config generate.
 ---
 
 # Polar billing config
 
-A billing config is one file that declares an organization's meters, benefits and products. The Polar CLI compares the file with what is on Polar and applies the difference, so a pricing change is reviewed like any other code change.
+A billing config is one file that declares an organization's meters, benefits and products. The Polar CLI compares the file with what is on Polar, then drafts and publishes the difference, so a pricing change is reviewed like any other code change.
 
 | File | For |
 | --- | --- |
@@ -22,8 +22,8 @@ A config file is one of two ways to manage a catalog. The other is the dashboard
 You do the engineering: write the file, run the commands, fix what they report. The user decides the business.
 
 - Never invent a product, a price, a currency, a billing interval or a benefit. Take them from the app (the pricing page, plan constants, existing checkout code) or from the user. If the app shows no pricing, ask.
-- `polar config plan` changes nothing. Run it as often as you need.
-- `polar config init`, `apply`, `publish` and `disable` change the organization. Run each only after the user has said yes to what it will do.
+- `polar config validate` changes nothing. Run it as often as you need.
+- `polar config init`, `draft`, `publish` and `disable` change the organization. Run each only after the user has said yes to what it will do.
 - Work in sandbox until the user asks for production.
 
 ## Step 1: Find the config
@@ -35,6 +35,8 @@ If there is none, `polar config init` writes it from the organization's existing
 - It turns on config for the organization. From then on products and benefits are edited in the file, not in the dashboard. `polar config disable` undoes this, but only until a second catalog version is published.
 - Existing meters, benefits and products without an external ID get one. The config refers to them by that ID from then on.
 
+The commands in this skill need the Polar CLI. If `polar` is not installed, install it with `npm install -g @polar-sh/cli`.
+
 ```bash
 polar auth whoami --json
 polar config init --sandbox --json
@@ -42,10 +44,10 @@ polar config init --sandbox --json
 
 `whoami` shows the active organization and environment. Pass `--org <slug>` when the account has several organizations.
 
-If the CLI is not signed in, ask the user which of these applies before going further:
+If the CLI is not signed in, and the user has not already told you in `setup-polar`, ask which of these applies before going further:
 
 - **They have a Polar organization.** They run `polar auth login --sandbox`, which opens a browser.
-- **They want you to create one.** Polar supports the [auth.md](https://polar.sh/auth.md) spec: read <https://sandbox.polar.sh/auth.md> for sandbox or <https://polar.sh/auth.md> for production, sign up on your own and create the organization. Then run the commands in this skill with your access token in place of a login: `POLAR_ACCESS_TOKEN=<access token> POLAR_ENVIRONMENT=sandbox polar config init --json`. Hand the organization over with a claim once the catalog is in place, and put the full `verification_uri` and the `user_code` in your reply to the user, copied exactly.
+- **They want you to create one.** Polar supports the [auth.md](https://polar.sh/auth.md) spec: read <https://sandbox.polar.sh/auth.md> for sandbox or <https://polar.sh/auth.md> for production, sign up on your own, ask what to call the organization and create it with `POST /v1/organizations/` (a `name` and a `slug`). Then run the commands in this skill with your access token in place of a login: `POLAR_ACCESS_TOKEN=<access token> POLAR_ENVIRONMENT=sandbox polar config init --json`. Hand the organization over with a claim once the catalog is in place: ask the user for the email address they will sign in to Polar with, and put the full `verification_uri` and the `user_code` in your reply, copied exactly. Once the claim succeeds, use the access token it returns, because the one you had stops working.
 - **They will create it themselves.** Send them to <https://sandbox.polar.sh/start>, then they run `polar auth login --sandbox`.
 
 `init` picks the format from the nearest project file: TypeScript with a `package.json`, JSON with a `pyproject.toml` or with neither. Pass `--format ts` or `--format json` when the project has both or the user wants the other one. For TypeScript it also installs the package the config imports.
@@ -65,7 +67,7 @@ Three rules hold in both formats:
 
 - **The external ID is the identity.** It is the key in TypeScript and the `external_id` field in JSON, and it is how Polar matches an entry to an existing resource. Changing it removes the old resource and creates a new one, so never rename one. To change what customers see, change the name.
 - **External IDs** start with a letter or digit and contain only letters, digits, `.`, `_`, `:` and `-`. Prefer snake_case: it stays a valid name in generated code.
-- **A section you leave out is left alone. A products section you include is the whole catalog:** an entry missing from a section you include is left out of the next catalog version, and `"products": []` takes every product off sale. `plan` lists these as removed, "not in config". Nothing is deleted on Polar and customers keep what they have, but treat every removal in a plan as something the user must have asked for.
+- **A section you leave out is left alone. A products section you include is the whole catalog:** an entry missing from a section you include is left out of the next catalog version, and `"products": []` takes every product off sale. `validate` lists these as removed, "not in config". Nothing is deleted on Polar and customers keep what they have, but treat every removal `validate` reports as something the user must have asked for.
 
 ### TypeScript
 
@@ -178,52 +180,57 @@ The file is one object. Each section is a list, and each entry carries its `exte
 | `unit_amount` on a metered or tiered price | Cents per unit, a string, fractions allowed | `"0.2"` is $0.002 per call, so $2 per 1,000 |
 | `cap_amount` | Whole cents, a number | `10000` caps the charge at $100.00 |
 
-The plan prints amounts as money (`$29 per month`, `$2 per 1,000`). Run `polar config plan` without `--json` once to see them, and read each one back against what the user said: the JSON output only has the raw numbers.
+`validate` prints amounts as money (`$29 per month`, `$2 per 1,000`). Run `polar config validate` without `--json` once to see them, and read each one back against what the user said: the JSON output only has the raw numbers.
 
-- **Meters.** `filter` holds `clauses` joined by `conjunction` (`and` or `or`). A clause has a `property`, an `operator` (`eq`, `ne`, `gt`, `gte`, `lt`, `lte`, `like`, `not_like`) and a `value`. The property `name` is the event name; any other property is read from the event's metadata. `aggregation` is `{ "func": "count" }`, or `sum`, `avg`, `min`, `max` or `unique` with a `"property"`.
+- **Meters.** `filter` holds `clauses` joined by `conjunction` (`and` or `or`). A clause has a `property`, an `operator` (`eq`, `ne`, `gt`, `gte`, `lt`, `lte`, `like`, `not_like`) and a `value`. The property `name` is the event name; any other property is read from the event's metadata. `aggregation` is `{ "func": "count" }`, or `sum`, `avg`, `min`, `max` or `unique` with a `"property"`. `unit` is optional: `scalar` (the default), `token`, or `custom` with a `custom_label`.
 - **Benefits.** `type` is `feature_flag`, a feature the app checks, or `meter_credit`, usage included before a metered price charges, with `properties` naming the `meter`, the `units` and whether unused units `rollover`.
 - **Products.** `recurring_interval` is `day`, `week`, `month` or `year`; add `recurring_interval_count` for every 3 months. Leave `recurring_interval` out for a one-time purchase. It cannot change once the product exists. Optional: `description`, and a trial with `trial_interval` and `trial_interval_count`.
 - **Prices.** `amount_type` is `fixed`, `metered_unit`, `metered_tiers`, `seat_based` or `unit_based`. A free plan is a fixed price of `0`. A metered price needs a recurring product.
 - **Tiers** (for `metered_tiers`, `seat_based` and `unit_based`) go in `"tiers": { "type": "graduated", "tiers": [...] }`, with `volume` as the other type. Each tier has a `unit_amount` and a `bound`, the last unit it covers; the last tier has no `bound`.
 - **Several currencies.** Add one price object per currency. Every currency must have the same set of price types.
 
-Keys the format does not know are rejected, and so are comments and trailing commas. For anything not shown here, write your best guess and run `polar config plan`: an error names the field and lists the values it accepts. When the organization already has resources, the entries `init` wrote are the most reliable examples.
+Keys the format does not know are rejected, and so are comments and trailing commas. For anything not shown here, write your best guess and run `polar config validate`: an error names the field and lists the values it accepts. When the organization already has resources, the entries `init` wrote are the most reliable examples.
 
-## Step 3: Plan, fix, show
+## Step 3: Validate, fix, show
 
 ```bash
-polar config plan --json
+polar config validate --json
 ```
 
 - `entries` lists each resource with an `action` of `created`, `updated`, `unchanged` or `removed`, and for a change the `diff` of each field, `before` and `after`.
 - `issues` lists problems with a `severity`, the `path` of the entry (`meters.tokens.name`), a `message` and the `location` in the file.
 
-Fix every issue with severity `error` in the file and plan again. Show warnings to the user. "No events with this name have been received yet" is expected until the app sends that event; check the event name for a typo, then move on.
+Fix every issue with severity `error` in the file and validate again. Show warnings to the user. "No events with this name have been received yet" is expected until the app sends that event; check the event name for a typo, then move on.
 
-If the plan changes something you did not touch, the file is out of date with Polar. Stop and show the user instead of applying over it.
+If `validate` reports a change to something you did not touch, the file is out of date with Polar. Stop and show the user instead of drafting over it.
 
 Then tell the user in plain words what would be created, updated and removed, with the old and new value of every price that changes.
 
-## Step 4: Apply, then publish
+## Step 4: Draft, then publish
 
 Ask before each command. `--confirm` skips the CLI's own question, which a shell without a terminal cannot answer, so the user's yes to you is the confirmation.
 
 ```bash
-polar config apply --confirm --json
+polar config draft --confirm --json
 polar config publish --confirm --json
 ```
 
-- `apply` saves meters, benefits, products and settings to a draft catalog, and nothing a customer sees changes yet.
+- `draft` saves meters, benefits, products and settings to the draft catalog, and nothing a customer sees changes yet.
 - `publish` makes the draft live: new checkouts sell it. Existing customers stay on the version they bought.
 
-Between `apply` and `publish`, four things look wrong and are not:
+Normally `draft` just updates the draft. It stops with a conflict when the draft on Polar contains changes that the local config file does not have, for example because a teammate drafted a change from their own copy of the file and has not committed it. Carrying on would throw their changes away. With `--json` the result has `"status": "conflict"` and a `conflicts` list naming each resource and whether the draft added, changed or removed it. Do not pick a way out on your own: show the user that list and ask which of these they want.
 
-- `plan` still lists the applied changes and still says to run `apply`. It compares the file with the live catalog, not with the draft. The next step is `publish`.
-- `apply` run again reports the same entries as created or updated.
+- `polar config draft --force` makes the draft on Polar match the local file and discards the other changes.
+- `polar config reset` rewrites the local config file to match what is on Polar: the draft when there is one, the live catalog otherwise. It replaces the whole file, so comments and anything that is not on Polar are lost. Without a terminal it needs `--confirm`, like the other commands that change something.
+
+Between `draft` and `publish`, four things look wrong and are not:
+
+- `validate` still lists the drafted changes and still says to run `draft`. It compares the file with the live catalog, not with the draft. The next step is `publish`.
+- `draft` run again reports the same entries as created or updated.
 - A meter that is new in the draft does not count usage until `publish`. A customer's balance for it does not move while the catalog is only a draft, so publish before you test usage.
 - Each `publish` makes a new catalog version (`v1`, `v2`, ...). A product that changed gets a new ID on Polar and the old one stays for the customers who bought it, which is why application code uses external IDs (Step 5).
 
-`publish` ships the draft, not the file. If the file changed after the last `apply`, run `apply` again first. To check, run `polar config publish` without `--confirm` and without `--json`: it prints a "Not in the draft" section listing what differs, then stops for confirmation. Publish with `--confirm` only when that section is absent. If the user took a change back after it was applied, say so and show them that section; do not publish over it.
+`publish` ships the draft, not the file. If the file changed after the last `draft`, run `draft` again first. To check, run `polar config publish` without `--confirm` and without `--json`: it prints a "Not in the draft" section listing what differs, then stops for confirmation. Without a terminal it exits with an error at that point, which is expected. Publish with `--confirm` only when that section is absent. If the user took a change back after it was drafted, say so and show them that section; do not publish over it.
 
 Production is a separate organization with its own catalog. When the user asks for it, have them run `polar auth login --production`, check `polar auth whoami --json`, then repeat Step 3 and Step 4 with the same file.
 
@@ -232,9 +239,9 @@ Production is a separate organization with its own catalog. When the user asks f
 | The user wants to | Do this |
 | --- | --- |
 | Rename what customers see | Change the name. Keep the key. |
-| Change a price | Edit it, apply and publish. Existing subscribers keep their price. |
-| Stop selling a product | Mark it deprecated, apply and publish. Don't delete the entry: a product with active subscriptions that is missing from the file is an error. |
-| Change what a meter counts | Once a meter has billed usage, Polar rejects a change to its filter or aggregation, and `plan` reports it. Add a new meter under a new key and deprecate the old one. |
+| Change a price | Edit it, draft and publish. Existing subscribers keep their price. |
+| Stop selling a product | Mark it deprecated, draft and publish. Don't delete the entry: a product with active subscriptions that is missing from the file is an error. |
+| Change what a meter counts | Once a meter has billed usage, Polar rejects a change to its filter or aggregation, and `validate` reports it. Add a new meter under a new key and deprecate the old one. |
 | Clean up the file | Run `polar config prune`. It removes deprecated entries nothing uses any more and changes nothing on Polar. |
 
 Deprecate with `.deprecated()` in TypeScript and `"deprecated": true` in JSON. A deprecated entry stays for the customers who have it, and nothing new can use it. A live product cannot grant a deprecated benefit: take the benefit out of the product's list first.
@@ -260,7 +267,7 @@ Events.api_call       # "api_call", from the meters' filters
 
 - The language comes from the project (`pyproject.toml`, `requirements.txt`, `setup.py` or `Pipfile` means Python). Pass `--language py` when it cannot tell. Python is the only language so far; in another language, use the external IDs as plain strings.
 - `--out src/myapp/polar_types.py` puts the file elsewhere. It never replaces a file it did not write.
-- Run it again after every change to the config, and commit the file. `polar config generate --check` writes nothing and fails when the file is missing or out of date; add it to CI.
+- Run it again after every change to the config, and commit the file. `polar config generate --check` writes nothing and fails when the file is missing or out of date; add it to CI, with the same `--out` if you used one.
 - Never edit the generated file.
 
 The API takes external IDs directly from version 2027-01, so the app never stores Polar's own IDs. In Python that is `from polar.v2027_01 import Polar`, then for example `external_products=[Products.pro]` when creating a checkout, `external_benefit_id=Benefits.priority_support` when listing a customer's benefit grants and `external_meter_id=Meters.api_calls` when reading a customer's meter. In TypeScript, import the client from `@polar-sh/sdk/2027-01` and pass `external_products: ["pro"]` to `polar.checkouts.create`.
@@ -269,4 +276,4 @@ Never put a Polar product ID in the app's code or env file. Each publish gives a
 
 ## After the catalog is live
 
-To sell the products, hand off to the `polar-integration` skill for the Checkout, Customer Portal and Webhooks endpoints, and to `polar-testing` to try them in sandbox. Follow "Projects with a billing config" in its Checkout recipe, so the app sells by external ID.
+To sell the products, hand off to the `polar-integration` skill for the Checkout, Customer Portal and Webhooks endpoints, and to `polar-testing` to try them in sandbox. Follow "Projects with a billing config" in its Checkout recipe, so the app sells by external ID. That skill is written for TypeScript. In another language, build the same three endpoints from the SDK's documentation and the [API reference](https://polar.sh/docs/api-reference), using the external IDs from Step 5.
