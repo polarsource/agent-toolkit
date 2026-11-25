@@ -153,6 +153,7 @@ If the project has a `polar.config.ts` or `polar.config.json` (see the `polar-co
 
 - Import the client from `@polar-sh/sdk/2027-01`, the first API version that takes external IDs.
 - Pass `external_products` in place of `products`: `polar.checkouts.create({ external_products: ["pro"], ... })`. The handler above then takes `?products=pro`.
+- Import `webhooks` from `@polar-sh/sdk/2027-01` as well in Recipe 3, and set the webhook endpoint to the same API version, so payloads match the client's types.
 - Sell through this endpoint, which creates a checkout session for each purchase, rather than through a checkout link created once.
 
 ### Framework variations

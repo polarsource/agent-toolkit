@@ -150,4 +150,4 @@ Once basic setup works, suggest:
 
 1. **Link to your auth** - Pass `external_customer_id` from the logged-in user when creating checkouts.
 2. **Add benefits** - License keys, file downloads, Discord roles.
-3. **Go production** - Production is separate from sandbox: set up the organization at polar.sh, re-create the product (it gets a new ID), create a production access token and webhook endpoint, and set `POLAR_ENVIRONMENT=production`. Then submit the organization for review in the dashboard; checkouts are blocked until it can accept payments.
+3. **Go production** - Production is separate from sandbox: set up the organization at polar.sh, re-create the product (it gets a new ID; with a config file, apply and publish the same file there instead, and the external IDs stay the same), create a production access token and webhook endpoint, and set `POLAR_ENVIRONMENT=production`. Then submit the organization for review in the dashboard; checkouts are blocked until it can accept payments.

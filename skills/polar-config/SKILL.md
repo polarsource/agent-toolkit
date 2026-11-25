@@ -40,7 +40,13 @@ polar auth whoami --json
 polar config init --sandbox --json
 ```
 
-`whoami` shows the active organization and environment. If the CLI is not signed in, ask the user to run `polar auth login --sandbox`, which opens a browser. Pass `--org <slug>` when the account has several organizations.
+`whoami` shows the active organization and environment. Pass `--org <slug>` when the account has several organizations.
+
+If the CLI is not signed in, ask the user which of these applies before going further:
+
+- **They have a Polar organization.** They run `polar auth login --sandbox`, which opens a browser.
+- **They want you to create one.** Polar supports the [auth.md](https://polar.sh/auth.md) spec: read <https://sandbox.polar.sh/auth.md> for sandbox or <https://polar.sh/auth.md> for production, sign up on your own and create the organization. Then run the commands in this skill with your access token in place of a login: `POLAR_ACCESS_TOKEN=<access token> POLAR_ENVIRONMENT=sandbox polar config init --json`. Hand the organization over with a claim once the catalog is in place, and put the full `verification_uri` and the `user_code` in your reply to the user, copied exactly.
+- **They will create it themselves.** Send them to <https://sandbox.polar.sh/start>, then they run `polar auth login --sandbox`.
 
 `init` picks the format from the nearest project file: TypeScript with a `package.json`, JSON with a `pyproject.toml` or with neither. Pass `--format ts` or `--format json` when the project has both or the user wants the other one. For TypeScript it also installs the package the config imports.
 
@@ -101,6 +107,10 @@ export default defineConfig({
 - **Prices** are `free()`, `fixed()`, `seats()`, `units()` and `meter(key)`. Tiered prices use `.graduated(...)` or `.volume(...)` with `tier()`.
 
 The package is fully typed. For anything not shown here, read its type declarations in `node_modules` rather than guessing: a wrong helper is a type error, and a reference to a meter or benefit key that does not exist is one too.
+
+### Settings
+
+`init` also writes a `settings` section with the organization's default currency and tax behavior: `settings: { payments: { currency: 'usd', tax: 'location' } }` in TypeScript, and the same object under `"settings"` in JSON. `tax` is `location`, `inclusive` or `exclusive`. It applies to the whole organization and takes effect on `publish`, so leave it as `init` wrote it unless the user asks for a change.
 
 ### JSON
 
@@ -203,13 +213,14 @@ polar config apply --confirm --json
 polar config publish --confirm --json
 ```
 
-- `apply` saves meters, benefits, products and settings to a draft catalog, and nothing a customer sees changes yet. Webhooks apply right away.
+- `apply` saves meters, benefits, products and settings to a draft catalog, and nothing a customer sees changes yet.
 - `publish` makes the draft live: new checkouts sell it. Existing customers stay on the version they bought.
 
-Between `apply` and `publish`, three things look wrong and are not:
+Between `apply` and `publish`, four things look wrong and are not:
 
 - `plan` still lists the applied changes and still says to run `apply`. It compares the file with the live catalog, not with the draft. The next step is `publish`.
 - `apply` run again reports the same entries as created or updated.
+- A meter that is new in the draft does not count usage until `publish`. A customer's balance for it does not move while the catalog is only a draft, so publish before you test usage.
 - Each `publish` makes a new catalog version (`v1`, `v2`, ...). A product that changed gets a new ID on Polar and the old one stays for the customers who bought it, which is why application code uses external IDs (Step 5).
 
 `publish` ships the draft, not the file. If the file changed after the last `apply`, run `apply` again first. To check, run `polar config publish` without `--confirm` and without `--json`: it prints a "Not in the draft" section listing what differs, then stops for confirmation. Publish with `--confirm` only when that section is absent. If the user took a change back after it was applied, say so and show them that section; do not publish over it.

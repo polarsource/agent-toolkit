@@ -134,6 +134,8 @@ polar webhook trigger order.paid --seed 7               # the same IDs on every 
 
 Use an organization access token with the `products:write` and `checkouts:write` scopes. Organization tokens already imply the organization, so don't pass `organization_id`.
 
+If the project has a `polar.config.ts` or `polar.config.json`, skip the `beforeAll` below: Polar rejects products created outside the config file. Test with a product from the config instead, by its external ID and the `2027-01` client: `external_products: ["pro"]` in place of `products`.
+
 ```typescript
 import { describe, it, expect, beforeAll } from "vitest";
 import { createPolar } from "@polar-sh/sdk/2026-10";
