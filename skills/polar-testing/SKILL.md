@@ -52,7 +52,8 @@ polar = Polar(os.environ["POLAR_ACCESS_TOKEN"], environment="sandbox")
 ### Sandbox Limitations
 
 - No real money is processed, and data is isolated from production
-- Customer-facing emails (receipts, renewal reminders) are only delivered to members of your organization; `you+test@example.com` aliases are accepted
+- Customer-facing emails (receipts, renewal reminders) are only delivered to members of your organization; `+test` aliases of their addresses are accepted
+- A customer email must be on a domain that can receive mail. Polar rejects `@example.com` and made-up domains, at checkout and in the API, so test with a real address such as a `+test` alias of your own
 - The API allows 100 requests per minute, against 500 in production, which matters for large integration suites
 
 ## Test Cards
@@ -157,7 +158,7 @@ describe("Polar Checkout", () => {
     const checkout = await polar.checkouts.create({
       products: [testProductId],
       success_url: "http://localhost:3000/success",
-      customer_email: "test@example.com",
+      customer_email: process.env.POLAR_TEST_EMAIL, // a real address: Polar rejects @example.com
     });
 
     expect(checkout.status).toBe("open");
