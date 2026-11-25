@@ -158,7 +158,6 @@ describe("Polar Checkout", () => {
     const checkout = await polar.checkouts.create({
       products: [testProductId],
       success_url: "http://localhost:3000/success",
-      customer_email: process.env.POLAR_TEST_EMAIL, // a real address: Polar rejects @example.com
     });
 
     expect(checkout.status).toBe("open");
