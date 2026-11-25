@@ -20,7 +20,7 @@ If the project already uses `@polar-sh/sdk` below 1.0 (signs: `new Polar(...)`, 
 
 Don't install the deprecated `@polar-sh/<framework>` adapters (`@polar-sh/express`, `@polar-sh/hono`, `@polar-sh/fastify`, `@polar-sh/elysia`, `@polar-sh/astro`, `@polar-sh/sveltekit`, `@polar-sh/remix`, `@polar-sh/deno`, `@polar-sh/supabase`). `@polar-sh/nextjs`, `@polar-sh/nuxt`, `@polar-sh/tanstack-start` and `@polar-sh/better-auth` are maintained; keep them if the project already uses them.
 
-**No Polar account yet?** Polar supports the [auth.md](https://polar.sh/auth.md) spec: an agent can sign up on its own, without a human, set up the organization (products, benefits, meters, checkouts), and hand it over to the user later. Read <https://polar.sh/auth.md> to learn how to sign up and get claimed.
+**No Polar account yet?** Polar supports the [auth.md](https://polar.sh/auth.md) spec: an agent can sign up on its own, without a human, set up the organization (products, benefits, meters, checkouts), and hand it over to the user later. Read <https://polar.sh/auth.md> to learn how to sign up and get claimed. When you start the claim, put the full `verification_uri` and the `user_code` in your reply to the user, copied exactly. Tool and command output is often collapsed or hidden, so the link only reaches the user if you write it in your message, and they can't claim the organization without it.
 
 Required environment variables (use whatever loader your framework provides — `process.env`, `Deno.env`, `import.meta.env`, etc.):
 
