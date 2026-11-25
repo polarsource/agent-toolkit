@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.2.4
+
+- `setup-polar` and `polar-integration` now start a first-time setup by asking whether you have a Polar organization, want the agent to create one, or will create it yourself, and suggest starting in sandbox.
+- `setup-polar` and the README set agents up with `polar agent setup` from the Polar CLI instead of connecting the MCP server by hand.
+- `setup-polar` and `polar-testing` no longer use `@example.com` email addresses, which Polar rejects at checkout.
+- `polar-integration` tells agents to put the claim link and code in their reply, so the user can claim an organization the agent created.
+- `polar-migration`: Stripe migrations are open to every organization that is ready to sell, so the skill no longer says they are rolling out gradually.
+
 ## 0.2.3
 
 - Tell agents without a Polar account to read https://polar.sh/auth.md to sign up on their own in `polar-integration`.
