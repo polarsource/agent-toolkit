@@ -15,6 +15,8 @@ A billing config is one file that declares an organization's meters, benefits an
 
 There is no config language per programming language. A Python project uses the JSON file, plus a generated file of names for its code (Step 5).
 
+A config file is one of two ways to manage a catalog. The other is the dashboard, which is how every organization works until `polar config init` turns config on. Use this skill when the project already has a config file or the user asks to manage the catalog in code. Don't move an organization to a config file on your own: suggest it when it fits, and let the user choose.
+
 ## Who decides what
 
 You do the engineering: write the file, run the commands, fix what they report. The user decides the business.
@@ -250,8 +252,10 @@ Events.api_call       # "api_call", from the meters' filters
 - Run it again after every change to the config, and commit the file. `polar config generate --check` writes nothing and fails when the file is missing or out of date; add it to CI.
 - Never edit the generated file.
 
-The API takes external IDs directly from version 2027-01, so the app never stores Polar's own IDs. In Python that is `from polar.v2027_01 import Polar`, then for example `external_products=[Products.pro]` when creating a checkout, `external_benefit_id=Benefits.priority_support` when listing a customer's benefit grants and `external_meter_id=Meters.api_calls` when reading a customer's meter.
+The API takes external IDs directly from version 2027-01, so the app never stores Polar's own IDs. In Python that is `from polar.v2027_01 import Polar`, then for example `external_products=[Products.pro]` when creating a checkout, `external_benefit_id=Benefits.priority_support` when listing a customer's benefit grants and `external_meter_id=Meters.api_calls` when reading a customer's meter. In TypeScript, import the client from `@polar-sh/sdk/2027-01` and pass `external_products: ["pro"]` to `polar.checkouts.create`.
+
+Never put a Polar product ID in the app's code or env file. Each publish gives a changed product a new ID, and a checkout created with the old one fails with "Product is no longer sold".
 
 ## After the catalog is live
 
-To sell the products, hand off to the `polar-integration` skill for the Checkout, Customer Portal and Webhooks endpoints, and to `polar-testing` to try them in sandbox.
+To sell the products, hand off to the `polar-integration` skill for the Checkout, Customer Portal and Webhooks endpoints, and to `polar-testing` to try them in sandbox. Follow "Projects with a billing config" in its Checkout recipe, so the app sells by external ID.

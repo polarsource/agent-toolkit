@@ -87,7 +87,9 @@ List the organizations with MCP. If there are several, ask which one to use. Not
 
 ### Step 5: Create First Product
 
-Create the product with MCP (`POST /v1/products/`). The price must be in the organization's `default_presentment_currency`, and the billing interval is fixed per product. Example for a monthly subscription:
+If the project has a `polar.config.ts` or `polar.config.json`, the catalog is managed in that file and Polar rejects products created any other way. Add the product with the `polar-config` skill instead, and pass its external ID, not a product ID, on to Step 6.
+
+Otherwise, create the product with MCP (`POST /v1/products/`). The price must be in the organization's `default_presentment_currency`, and the billing interval is fixed per product. Example for a monthly subscription:
 
 ```json
 {

@@ -28,7 +28,7 @@ Required environment variables (use whatever loader your framework provides — 
 - `POLAR_WEBHOOK_SECRET` — only needed for the webhook recipe.
 - `POLAR_ENVIRONMENT` — `sandbox` while developing; omit it or set `production` in production. Sandbox and production are separate, so each needs its own token.
 
-The SDK is versioned by API version: the import path pins it. Use `2026-10`, the current version, unless the project already imports another one. Construct one client in a server-only module and reuse it:
+The SDK is versioned by API version: the import path pins it. Use `2026-10`, the current version, unless the project already imports another one or has a billing config (see "Projects with a billing config" in Recipe 1). Construct one client in a server-only module and reuse it:
 
 ```ts
 import { createPolar, type Environment } from "@polar-sh/sdk/2026-10";
@@ -144,6 +144,16 @@ export async function handleCheckout(request: Request): Promise<Response> {
 ```
 
 This handler accepts a GET request with `?products=<product_id>`. Drop fields you don't need and add fields from the table above (`metadata`, `embed_origin`, `locale`, ...) as needed.
+
+### Projects with a billing config
+
+Most organizations manage products in the dashboard. Their product IDs never change, and the handler above is right as it is.
+
+If the project has a `polar.config.ts` or `polar.config.json` (see the `polar-config` skill), the catalog is managed in that file instead, and publishing a change gives the changed product a new ID. A product ID kept in the app's code or env file then stops working: the checkout fails with "Product is no longer sold". Refer to products by their external ID from the config, which never changes:
+
+- Import the client from `@polar-sh/sdk/2027-01`, the first API version that takes external IDs.
+- Pass `external_products` in place of `products`: `polar.checkouts.create({ external_products: ["pro"], ... })`. The handler above then takes `?products=pro`.
+- Sell through this endpoint, which creates a checkout session for each purchase, rather than through a checkout link created once.
 
 ### Framework variations
 
