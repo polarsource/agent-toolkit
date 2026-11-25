@@ -8,6 +8,20 @@ description: |
 
 Interactive setup guide to get Polar payments working in your project.
 
+## Start here: organization and environment
+
+Ask these two questions before anything else, and wait for the answers.
+
+**1. Which organization?**
+
+- **I already have one.** Continue with Step 1. The user signs in and picks it in Step 4.
+- **Create one for me.** Polar supports the [auth.md](https://polar.sh/auth.md) spec: you sign up on your own, create the organization and its products, and hand it over to the user with a claim. Read <https://sandbox.polar.sh/auth.md> for sandbox or <https://polar.sh/auth.md> for production, and follow it. Skip Steps 1, 2 and 4, and create the product in Step 5 through the API with your access token. Start the claim before Step 6: the app's access token and the webhooks need it. When you start it, put the full `verification_uri` and the `user_code` in your reply to the user, copied exactly. Tool and command output is often collapsed or hidden, so the link only reaches the user if you write it in your message, and they can't claim the organization without it.
+- **I'll create it myself.** Send them to <https://sandbox.polar.sh/start> for sandbox or <https://polar.sh/start> for production, and continue with Step 1 once they have it.
+
+**2. Sandbox or production?**
+
+Suggest sandbox. It is a separate copy of Polar where checkout takes test cards, so you can make a test purchase and check the whole flow end to end (checkout, webhook, access) before real money is involved. Start in production only when the user asks for it; Step 9 covers going live.
+
 ## Setup Flow
 
 Follow these steps in order:
@@ -58,16 +72,12 @@ Ask the user:
    - Next.js (App Router), Express, Hono, Astro, SvelteKit, Remix, TanStack Start, Nuxt, Fastify, Cloudflare Workers, or another TypeScript/JavaScript framework
    - Python: there's no integration skill; follow the [Python SDK docs](https://polar.sh/docs/integrate/sdk/python)
 
-2. **Environment**: Start with sandbox or production?
-   - Sandbox (recommended for new setups)
-   - Production
-
-3. **Product type**: What are you selling?
+2. **Product type**: What are you selling?
    - Subscription (recurring)
    - One-time purchase
    - Both
 
-From here on, use the `polar-sandbox` server's tools for sandbox and the `polar` server's tools for production. If only `polar` is available (as in ChatGPT), create sandbox products in the sandbox dashboard or with the Polar CLI instead.
+From here on, work in the environment chosen at the start: use the `polar-sandbox` server's tools for sandbox and the `polar` server's tools for production. If only `polar` is available (as in ChatGPT), create sandbox products in the sandbox dashboard or with the Polar CLI instead.
 
 ### Step 4: Choose the Organization
 

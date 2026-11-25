@@ -21,8 +21,8 @@ runs:
             ".cursor-plugin/plugin.json",
             "openai/plugin.json",
             "gemini-extension.json",
+            "plugin.json",
           ];
-          const NAMED_FILES = [...MANIFESTS, "plugin.json"];
           const MARKETPLACES = [".claude-plugin/marketplace.json", ".cursor-plugin/marketplace.json"];
           const IMAGE_EXTENSIONS = new Set([".png", ".jpg", ".jpeg", ".gif", ".webp", ".ico"]);
           const TEXT_EXTENSIONS = new Set([".md", ".txt", ".json", ".yml", ".yaml"]);
@@ -36,7 +36,7 @@ runs:
           const MARKDOWN_LINK = /\]\((https?:\/\/[^)\s]+)\)|<(https?:\/\/[^>\s]+)>/g;
 
           function checkNames() {
-            for (const path of NAMED_FILES) {
+            for (const path of MANIFESTS) {
               if (readJson(path).name !== "polar") fail(`${path}: name must be "polar"`);
             }
             for (const path of MARKETPLACES) {
@@ -373,6 +373,7 @@ runs:
             ".cursor-plugin/plugin.json",
             "openai/plugin.json",
             "gemini-extension.json",
+            "plugin.json",
           ];
           const VERSION = /^(\d+)\.(\d+)\.(\d+)$/;
           const USAGE = 'Usage: node bump-version.mjs <patch|minor|major|X.Y.Z> "<change>" ["<change>" ...]';

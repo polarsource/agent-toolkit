@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.2.3
+
+- Tell agents without a Polar account to read https://polar.sh/auth.md to sign up on their own in `polar-integration`.
+
 ## 0.2.2
 
 - Update the Polar logo used by the plugins.
