@@ -1,18 +1,19 @@
 ---
 name: polar-config
 description: |
-  Manage a Polar catalog as code with a billing config file (polar.config.ts, polar_config.py or polar.config.json) and the "polar config" commands of the Polar CLI. Use this skill whenever the user wants to: (1) create or edit a Polar billing config; (2) add or change meters, benefits, products or prices in it; (3) write the config from their app's pricing; (4) preview or apply it with polar config plan, apply or publish; (5) fix an issue those commands report; (6) retire a meter, benefit or product with deprecated and polar config prune.
+  Manage a Polar catalog as code with a billing config file (polar.config.ts or polar.config.json) and the "polar config" commands of the Polar CLI. Use this skill whenever the user wants to: (1) create or edit a Polar billing config; (2) add or change meters, benefits, products or prices in it; (3) write the config from their app's pricing; (4) preview or apply it with polar config plan, apply or publish; (5) fix an issue those commands report; (6) retire a meter, benefit or product with deprecated and polar config prune; (7) generate the config's names for application code with polar config generate.
 ---
 
 # Polar billing config
 
 A billing config is one file that declares an organization's meters, benefits and products. The Polar CLI compares the file with what is on Polar and applies the difference, so a pricing change is reviewed like any other code change.
 
-| File | Language |
+| File | For |
 | --- | --- |
-| `polar.config.ts` | TypeScript |
-| `polar_config.py` | Python. Meters only for now. |
-| `polar.config.json` | JSON, for any other project |
+| `polar.config.ts` | JavaScript and TypeScript projects |
+| `polar.config.json` | Every other project: Python, Go, Ruby, PHP and so on |
+
+There is no config language per programming language. A Python project uses the JSON file, plus a generated file of names for its code (Step 5).
 
 ## Who decides what
 
@@ -25,7 +26,7 @@ You do the engineering: write the file, run the commands, fix what they report. 
 
 ## Step 1: Find the config
 
-Look for `polar.config.ts`, `polar_config.py` or `polar.config.json` in the project. If there is one, go to Step 2.
+Look for `polar.config.ts` or `polar.config.json` in the project. If there is one, go to Step 2.
 
 If there is none, `polar config init` writes it from the organization's existing meters, benefits and products. Tell the user what it does and wait for a yes:
 
@@ -39,22 +40,24 @@ polar config init --sandbox --json
 
 `whoami` shows the active organization and environment. If the CLI is not signed in, ask the user to run `polar auth login --sandbox`, which opens a browser. Pass `--org <slug>` when the account has several organizations.
 
-`init` picks the language from the project: TypeScript with a `package.json`, Python with a `pyproject.toml`, JSON otherwise. Pass `--format ts`, `--format py` or `--format json` when the project has both or the user wants another one. For TypeScript it also installs the package the config imports.
+`init` picks the format from the nearest project file: TypeScript with a `package.json`, JSON with a `pyproject.toml` or with neither. Pass `--format ts` or `--format json` when the project has both or the user wants the other one. For TypeScript it also installs the package the config imports.
+
+`init` fails with "already exists" when the config file is there. That is not an error to work around: the file is the config, go to Step 2.
 
 Read the result:
 
 | `status` | What to do |
 | --- | --- |
-| `written` | The file is at `file`. Tell the user what `imported` counts and list everything in `skipped`: those resources stay on Polar as they are and are not in the file. |
+| `written` | The file is at `file`. Tell the user what `imported` counts and list everything in `skipped`: those resources stay on Polar as they are and are not in the file. For a new organization the sections are empty; Step 2 shows what goes in them. |
 | `external_ids_required` | Nothing was written. Show the user the suggested IDs in `external_ids`. Run `polar config init --json --confirm` to accept them all, or pass `--external-id <id>=<external ID>` for each one they want to name. |
 
 ## Step 2: Edit the file
 
-Three rules hold in every language:
+Three rules hold in both formats:
 
-- **The key is the external ID.** It is how Polar matches an entry to an existing resource. Changing a key creates a new resource, so never rename one. To change what customers see, change the name.
-- **External IDs** start with a letter or digit and contain only letters, digits, `.`, `_`, `:` and `-`. In Python the attribute name is the ID, so use snake_case.
-- **A section you leave out is left alone. A products section you include is the whole catalog:** a live product missing from it is left out of the next catalog version. Meters and benefits missing from their section stay on Polar untouched.
+- **The external ID is the identity.** It is the key in TypeScript and the `external_id` field in JSON, and it is how Polar matches an entry to an existing resource. Changing it removes the old resource and creates a new one, so never rename one. To change what customers see, change the name.
+- **External IDs** start with a letter or digit and contain only letters, digits, `.`, `_`, `:` and `-`. Prefer snake_case: it stays a valid name in generated code.
+- **A section you leave out is left alone. A products section you include is the whole catalog:** an entry missing from a section you include is left out of the next catalog version, and `"products": []` takes every product off sale. `plan` lists these as removed, "not in config". Nothing is deleted on Polar and customers keep what they have, but treat every removal in a plan as something the user must have asked for.
 
 ### TypeScript
 
@@ -97,33 +100,82 @@ export default defineConfig({
 
 The package is fully typed. For anything not shown here, read its type declarations in `node_modules` rather than guessing: a wrong helper is a type error, and a reference to a meter or benefit key that does not exist is one too.
 
-### Python
-
-Declare the meters as attributes of a `MeterSet` subclass and assign the config to a module-level variable named `config`. The attribute name is the external ID.
-
-```python
-from polar.config import Config, Meter, MeterSet, Sum, eq
-
-
-class Meters(MeterSet):
-    api_calls = Meter("API calls", on="api_call")
-    tokens = Meter(
-        "Output tokens",
-        on="completion",
-        where=eq("status", "ok"),
-        aggregate=Sum("output_tokens"),
-        unit="token",
-    )
-
-
-config = Config(meters=Meters)
-```
-
-`on` is the event name. `where` takes `eq`, `ne`, `gt`, `gte`, `lt`, `lte`, `like`, `not_like`, `and_` and `or_`. `aggregate` takes `Count()` (the default), `Sum`, `Avg`, `Min`, `Max` and `Unique`. The CLI loads the file with `uv run` when the project has a `uv.lock`, and with `python3` otherwise, so `polar-sdk` must be installed in that environment.
-
 ### JSON
 
-The file has the sections as lists, and each entry carries its `external_id`. Don't write the shape from memory: read an entry `init` wrote and follow it.
+The file is one object. Each section is a list, and each entry carries its `external_id`. Entries refer to each other by external ID: a benefit names its `meter`, a product lists its `benefits`.
+
+```json
+{
+  "meters": [
+    {
+      "external_id": "api_calls",
+      "name": "API calls",
+      "filter": {
+        "conjunction": "and",
+        "clauses": [{ "property": "name", "operator": "eq", "value": "api_call" }]
+      },
+      "aggregation": { "func": "count" }
+    }
+  ],
+  "benefits": [
+    {
+      "external_id": "priority_support",
+      "description": "Priority support",
+      "type": "feature_flag"
+    },
+    {
+      "external_id": "included_calls",
+      "description": "1,000 API calls a month",
+      "type": "meter_credit",
+      "properties": { "meter": "api_calls", "units": 1000, "rollover": false }
+    }
+  ],
+  "products": [
+    {
+      "external_id": "free",
+      "name": "Free",
+      "recurring_interval": "month",
+      "prices": [{ "amount_type": "fixed", "price_currency": "usd", "price_amount": 0 }],
+      "benefits": []
+    },
+    {
+      "external_id": "pro",
+      "name": "Pro",
+      "recurring_interval": "month",
+      "prices": [
+        { "amount_type": "fixed", "price_currency": "usd", "price_amount": 2900 },
+        { "amount_type": "metered_unit", "price_currency": "usd", "meter": "api_calls", "unit_amount": "0.2" }
+      ],
+      "benefits": ["priority_support", "included_calls"]
+    },
+    {
+      "external_id": "credit_pack",
+      "name": "5,000 API calls",
+      "prices": [{ "amount_type": "fixed", "price_currency": "usd", "price_amount": 900 }],
+      "benefits": []
+    }
+  ]
+}
+```
+
+**Money is in cents, and this is where JSON configs go wrong.** There are no helpers like `usd(29)`, so check every amount twice.
+
+| Field | Written as | Example |
+| --- | --- | --- |
+| `price_amount` on a fixed price | Whole cents, a number. `0` is free. | `2900` is $29.00 |
+| `unit_amount` on a metered or tiered price | Cents per unit, a string, fractions allowed | `"0.2"` is $0.002 per call, so $2 per 1,000 |
+| `cap_amount` | Whole cents, a number | `10000` caps the charge at $100.00 |
+
+The plan prints amounts as money (`$29 per month`, `$2 per 1,000`). Run `polar config plan` without `--json` once to see them, and read each one back against what the user said: the JSON output only has the raw numbers.
+
+- **Meters.** `filter` holds `clauses` joined by `conjunction` (`and` or `or`). A clause has a `property`, an `operator` (`eq`, `ne`, `gt`, `gte`, `lt`, `lte`, `like`, `not_like`) and a `value`. The property `name` is the event name; any other property is read from the event's metadata. `aggregation` is `{ "func": "count" }`, or `sum`, `avg`, `min`, `max` or `unique` with a `"property"`.
+- **Benefits.** `type` is `feature_flag`, a feature the app checks, or `meter_credit`, usage included before a metered price charges, with `properties` naming the `meter`, the `units` and whether unused units `rollover`.
+- **Products.** `recurring_interval` is `day`, `week`, `month` or `year`; add `recurring_interval_count` for every 3 months. Leave `recurring_interval` out for a one-time purchase. It cannot change once the product exists. Optional: `description`, and a trial with `trial_interval` and `trial_interval_count`.
+- **Prices.** `amount_type` is `fixed`, `metered_unit`, `metered_tiers`, `seat_based` or `unit_based`. A free plan is a fixed price of `0`. A metered price needs a recurring product.
+- **Tiers** (for `metered_tiers`, `seat_based` and `unit_based`) go in `"tiers": { "type": "graduated", "tiers": [...] }`, with `volume` as the other type. Each tier has a `unit_amount` and a `bound`, the last unit it covers; the last tier has no `bound`.
+- **Several currencies.** Add one price object per currency. Every currency must have the same set of price types.
+
+Keys the format does not know are rejected, and so are comments and trailing commas. For anything not shown here, write your best guess and run `polar config plan`: an error names the field and lists the values it accepts. When the organization already has resources, the entries `init` wrote are the most reliable examples.
 
 ## Step 3: Plan, fix, show
 
@@ -149,8 +201,16 @@ polar config apply --confirm --json
 polar config publish --confirm --json
 ```
 
-- `apply` changes meters right away. Products and benefits are saved to a draft catalog, and nothing a customer sees changes yet. Until the draft is published, `plan` keeps listing them.
+- `apply` saves meters, benefits, products and settings to a draft catalog, and nothing a customer sees changes yet. Webhooks apply right away.
 - `publish` makes the draft live: new checkouts sell it. Existing customers stay on the version they bought.
+
+Between `apply` and `publish`, three things look wrong and are not:
+
+- `plan` still lists the applied changes and still says to run `apply`. It compares the file with the live catalog, not with the draft. The next step is `publish`.
+- `apply` run again reports the same entries as created or updated.
+- Each `publish` makes a new catalog version (`v1`, `v2`, ...). A product that changed gets a new ID on Polar and the old one stays for the customers who bought it, which is why application code uses external IDs (Step 5).
+
+`publish` ships the draft, not the file. If the file changed after the last `apply`, run `apply` again first. To check, run `polar config publish` without `--confirm` and without `--json`: it prints a "Not in the draft" section listing what differs, then stops for confirmation. Publish with `--confirm` only when that section is absent. If the user took a change back after it was applied, say so and show them that section; do not publish over it.
 
 Production is a separate organization with its own catalog. When the user asks for it, have them run `polar auth login --production`, check `polar auth whoami --json`, then repeat Step 3 and Step 4 with the same file.
 
@@ -164,7 +224,33 @@ Production is a separate organization with its own catalog. When the user asks f
 | Change what a meter counts | Once a meter has billed usage, Polar rejects a change to its filter or aggregation, and `plan` reports it. Add a new meter under a new key and deprecate the old one. |
 | Clean up the file | Run `polar config prune`. It removes deprecated entries nothing uses any more and changes nothing on Polar. |
 
-Deprecate with `.deprecated()` in TypeScript, `deprecated=True` in Python and `"deprecated": true` in JSON. A deprecated entry stays for the customers who have it, and nothing new can use it.
+Deprecate with `.deprecated()` in TypeScript and `"deprecated": true` in JSON. A deprecated entry stays for the customers who have it, and nothing new can use it. A live product cannot grant a deprecated benefit: take the benefit out of the product's list first.
+
+## Step 5: Names for application code
+
+Application code refers to the config by external ID: the product to sell, the benefit to check, the meter to read, the event to send. A typo in one of those strings fails silently at run time.
+
+With a TypeScript config the package types these for you. With a JSON config, generate them:
+
+```bash
+polar config generate
+```
+
+It writes one file next to the config with the external IDs and event names as constants and types. For a Python project that is `polar_types.py`:
+
+```python
+from polar_types import Benefits, Events, Meters, Products
+
+Products.pro          # "pro"
+Events.api_call       # "api_call", from the meters' filters
+```
+
+- The language comes from the project (`pyproject.toml`, `requirements.txt`, `setup.py` or `Pipfile` means Python). Pass `--language py` when it cannot tell. Python is the only language so far; in another language, use the external IDs as plain strings.
+- `--out src/myapp/polar_types.py` puts the file elsewhere. It never replaces a file it did not write.
+- Run it again after every change to the config, and commit the file. `polar config generate --check` writes nothing and fails when the file is missing or out of date; add it to CI.
+- Never edit the generated file.
+
+The API takes external IDs directly from version 2027-01, so the app never stores Polar's own IDs. In Python that is `from polar.v2027_01 import Polar`, then for example `external_products=[Products.pro]` when creating a checkout, `external_benefit_id=Benefits.priority_support` when listing a customer's benefit grants and `external_meter_id=Meters.api_calls` when reading a customer's meter.
 
 ## After the catalog is live
 
