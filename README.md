@@ -32,6 +32,15 @@ Both servers use OAuth. Nothing connects until you sign in to Polar and authoriz
 
 ## Installation
 
+The quickest way is the [Polar CLI](https://polar.sh/docs/integrate/cli/introduction). It detects Claude Code, Codex and Cursor and sets each one up with the Polar plugin, MCP server and skills:
+
+```bash
+npm install -g @polar-sh/cli
+polar agent setup
+```
+
+`polar agent setup --status` shows what is set up, and `polar agent setup --skills project` installs the skills into `.agents/skills` for any other agent. To install by hand instead, follow the section for your agent.
+
 ### Claude Code
 
 ```
