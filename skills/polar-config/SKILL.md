@@ -282,7 +282,24 @@ Events.api_call       # "api_call", from the meters' filters
 
 The API takes external IDs directly from version 2027-01, so the app never stores Polar's own IDs. In Python that is `from polar.v2027_01 import Polar`, then for example `external_products=[Products.pro]` when creating a checkout, `external_benefit_id=Benefits.priority_support` when listing a customer's benefit grants and `external_meter_id=Meters.api_calls` when reading a customer's meter. In TypeScript, import the client from `@polar-sh/sdk/2027-01` and pass `external_products: ["pro"]` to `polar.checkouts.create`. Changing a subscription's plan takes `external_product_id` the same way.
 
-Never put a Polar product ID in the app's code or env file. Each publish gives a changed product a new ID, and a checkout created with the old one fails with "Product is no longer sold".
+### Never store a product ID
+
+Each publish gives a changed product a new ID. A checkout created with the old one fails with "Product is no longer sold". Never put a product ID in the app's code, config or env file (no `POLAR_PRODUCT_ID`), and never paste in the new ID after a publish: the next price change breaks it again. Refer to the product by its external ID and resolve it when the app runs:
+
+- **Checkout.** Pass `external_products` as above. Polar picks the version on sale.
+- **Checkout links.** Prefer a checkout session per purchase. If the app uses a checkout link, keep only its URL: publish points existing links at the new version, but the product ID the link was created with goes stale. Creating a link takes product IDs only, so resolve the current one first, as below.
+- **Anything else that needs the product**, such as the prices on a pricing page. Look it up by external ID in the live catalog. The access token needs `products:read`.
+
+```ts
+const { items } = await polar.products.list({ external_id: "pro", catalog_status: "live" });
+const pro = items[0]; // the version on sale, or undefined when "pro" is not live
+```
+
+In Python: `polar.products.list(external_id=Products.pro, catalog_status="live").items`.
+
+Keep `catalog_status: "live"`. Without it the list also returns retired versions and a drafted one under the same external ID. `is_archived: false` does not drop them, because a retired version is not archived. `is_current` on a product is `true` only for the version on sale.
+
+Existing subscriptions stay on the version they bought, so old product IDs on them are expected. To check a customer's plan, compare `subscription.product.external_id`, not the product ID.
 
 ## Step 6: Review and release from CI
 
