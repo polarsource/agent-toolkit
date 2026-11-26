@@ -1,7 +1,7 @@
 ---
 name: polar-config
 description: |
-  Manage a Polar catalog as code with a billing config file (polar.config.ts or polar.config.json) and the "polar config" commands of the Polar CLI. Use this skill whenever the user wants to: (1) create or edit a Polar billing config; (2) add or change meters, benefits, products or prices in it; (3) write the config from their app's pricing; (4) check what would change, save it to the draft or publish it with polar config validate, draft or publish; (5) fix an issue those commands report; (6) retire a meter, benefit or product with deprecated and polar config prune; (7) generate the config's names for application code with polar config generate.
+  Manage a Polar catalog as code with a billing config file (polar.config.ts or polar.config.json) and the "polar config" commands of the Polar CLI. Use this skill whenever the user wants to: (1) create or edit a Polar billing config; (2) add or change meters, benefits, products or prices in it; (3) write the config from their app's pricing; (4) check what would change, save it to the draft or publish it with polar config validate, draft or publish; (5) fix an issue those commands report; (6) retire a meter, benefit or product with deprecated and polar config prune; (7) generate the config's names for application code with polar config generate; (8) set up CI to show config changes on pull requests and draft or publish them when they merge.
 ---
 
 # Polar billing config
@@ -273,6 +273,81 @@ Events.api_call       # "api_call", from the meters' filters
 The API takes external IDs directly from version 2027-01, so the app never stores Polar's own IDs. In Python that is `from polar.v2027_01 import Polar`, then for example `external_products=[Products.pro]` when creating a checkout, `external_benefit_id=Benefits.priority_support` when listing a customer's benefit grants and `external_meter_id=Meters.api_calls` when reading a customer's meter. In TypeScript, import the client from `@polar-sh/sdk/2027-01` and pass `external_products: ["pro"]` to `polar.checkouts.create`.
 
 Never put a Polar product ID in the app's code or env file. Each publish gives a changed product a new ID, and a checkout created with the old one fails with "Product is no longer sold".
+
+## Step 6: Review and release from CI
+
+Once the config is in the repository, CI can show every pricing change on its pull request and release it when the pull request merges. Set this up when the user asks for it, and ask them two things first:
+
+- **What should a merge do?** Save the draft only, so a person publishes it afterwards with `polar config publish` or in the dashboard, or draft and publish. Publishing from CI makes a merged pricing change live with no further step, so add it only when the user says so.
+- **Which organization does CI release to?** Usually production. For a sandbox organization, set `POLAR_ENVIRONMENT: sandbox` on the steps that run `polar`.
+
+CI signs in with organization access tokens instead of a login. Ask the user to create two and store them as repository secrets. Piping straight into `gh secret set` keeps the token off the screen:
+
+```bash
+polar auth token --scope organizations:read --scope meters:read --scope benefits:read --scope products:read | gh secret set POLAR_READ_TOKEN
+polar auth token --scope organizations:write --scope meters:write --scope benefits:write --scope products:write | gh secret set POLAR_WRITE_TOKEN
+```
+
+The first can only read and is for pull requests. The second writes and is for the main branch. Add `custom_fields:read` and `custom_fields:write` when the config has custom fields.
+
+A GitHub Actions workflow for a TypeScript config:
+
+```yaml
+name: Polar billing config
+
+on:
+  pull_request:
+    paths: [polar.config.ts]
+  push:
+    branches: [main]
+    paths: [polar.config.ts]
+
+jobs:
+  validate:
+    if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      - run: npm ci
+      - run: npm install -g @polar-sh/cli
+      - run: polar config validate --pr-comment
+        env:
+          POLAR_ACCESS_TOKEN: ${{ secrets.POLAR_READ_TOKEN }}
+          GITHUB_TOKEN: ${{ github.token }}
+
+  release:
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    environment: production
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      - run: npm ci
+      - run: npm install -g @polar-sh/cli
+      - run: polar config draft --confirm
+        env:
+          POLAR_ACCESS_TOKEN: ${{ secrets.POLAR_WRITE_TOKEN }}
+      - run: polar config publish --confirm
+        env:
+          POLAR_ACCESS_TOKEN: ${{ secrets.POLAR_WRITE_TOKEN }}
+```
+
+- Leave the `publish` step out when a merge should only save the draft.
+- `validate --pr-comment` posts what would change as one comment on the pull request, updates it on every push and removes it when the config no longer changes anything. It needs `GITHUB_TOKEN` and the `pull-requests: write` permission. It fails the job when the config has errors, so a broken config cannot merge.
+- The `validate` job skips pull requests from forks. They get no secrets, so the job would fail without a token.
+- When the config is not at the repository root, set `working-directory` on the steps that run `polar` and use the file's full path in `paths`.
+- `npm ci` is there because a TypeScript config imports its package. For a JSON config, drop it, point `paths` at `polar.config.json`, and add `polar config generate --check` to the `validate` job when the project generates names (Step 5).
+- `environment: production` is a GitHub environment. Suggest a required reviewer on it: a pricing change then needs a person's approval after the merge and before it reaches Polar.
+- `draft` stops in CI too when the draft on Polar has changes the file does not have. Do not add `--force` on your own. Ask the user whether the main branch should always win over a draft someone saved from their machine, and add it only if they say yes.
+- `--pr-comment` also works in Buildkite for a repository on GitHub. On any other CI system, run the same commands without it and read the job's output.
 
 ## After the catalog is live
 
