@@ -74,7 +74,7 @@ Three rules hold in both formats:
 Each section is a function that receives its helpers and returns the entries by key. Amounts are in the currency's major unit: `usd(29)` is $29.00. Every price in a product must list the same currencies.
 
 ```ts
-import { defineConfig, eq, eur, perThousand, usd } from '@polar-sh/polar'
+import { defineConfig, eq, eur, perThousand, usd } from '@polar-sh/config'
 
 export default defineConfig({
   meters: ({ meter }) => ({
