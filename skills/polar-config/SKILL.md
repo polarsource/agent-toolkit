@@ -291,6 +291,9 @@ Each publish gives a changed product a new ID. A checkout created with the old o
 - **Anything else that needs the product**, such as the prices on a pricing page. Look it up by external ID in the live catalog. The access token needs `products:read`.
 
 ```ts
+import { createPolar } from "@polar-sh/sdk/2027-01";
+
+const polar = createPolar({ accessToken: process.env.POLAR_ACCESS_TOKEN! });
 const { items } = await polar.products.list({ external_id: "pro", catalog_status: "live" });
 const pro = items[0]; // the version on sale, or undefined when "pro" is not live
 ```
