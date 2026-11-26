@@ -282,13 +282,19 @@ Events.api_call       # "api_call", from the meters' filters
 
 The API takes external IDs directly from version 2027-01, so the app never stores Polar's own IDs. In Python that is `from polar.v2027_01 import Polar`, then for example `external_products=[Products.pro]` when creating a checkout, `external_benefit_id=Benefits.priority_support` when listing a customer's benefit grants and `external_meter_id=Meters.api_calls` when reading a customer's meter. In TypeScript, import the client from `@polar-sh/sdk/2027-01` and pass `external_products: ["pro"]` to `polar.checkouts.create`. Changing a subscription's plan takes `external_product_id` the same way.
 
-### Never store a product ID
+### Never store a Polar ID for something in the config
 
-Each publish gives a changed product a new ID. A checkout created with the old one fails with "Product is no longer sold". Never put a product ID in the app's code, config or env file (no `POLAR_PRODUCT_ID`), and never paste in the new ID after a publish: the next price change breaks it again. Refer to the product by its external ID and resolve it when the app runs:
+Products, benefits, meters and custom fields are versioned. Publishing a change to one creates a new version with a new Polar ID and retires the old version. The external ID stays the same (for a custom field, its slug). A stored Polar ID goes stale at the next change: a checkout created with an old product ID fails with "Product is no longer sold", and an old benefit or meter ID no longer matches what new customers get.
 
-- **Checkout.** Pass `external_products` as above. Polar picks the version on sale.
-- **Checkout links.** Prefer a checkout session per purchase. If the app uses a checkout link, keep only its URL: publish points existing links at the new version, but the product ID the link was created with goes stale. Creating a link takes product IDs only, so resolve the current one first, as below.
-- **Anything else that needs the product**, such as the prices on a pricing page. Look it up by external ID in the live catalog. The access token needs `products:read`.
+Never put the Polar ID of a product, benefit or meter in the app's code, config or env file (no `POLAR_PRODUCT_ID`), and never paste in the new ID after a publish: the next change breaks it again. Name it by its external ID, and Polar resolves it to the version on sale:
+
+| The app wants to | Pass |
+| --- | --- |
+| Sell a product | `external_products` to `checkouts.create` |
+| Check or grant a customer's benefit | `external_benefit_id` to `benefitGrants.list` or `benefitGrants.create` |
+| Read or credit a customer's meter | `external_meter_id` to `customerMeters.list` or `customerMeters.credits` |
+| Filter subscriptions, orders, checkouts or metrics by product | `external_product_id` |
+| Fetch the product, benefit or meter itself, such as the prices on a pricing page | `external_id` and `catalog_status: "live"` to `products.list`, `benefits.list` or `meters.list` |
 
 ```ts
 import { createPolar } from "@polar-sh/sdk/2027-01";
@@ -298,11 +304,13 @@ const { items } = await polar.products.list({ external_id: "pro", catalog_status
 const pro = items[0]; // the version on sale, or undefined when "pro" is not live
 ```
 
-In Python: `polar.products.list(external_id=Products.pro, catalog_status="live").items`.
+In Python: `polar.products.list(external_id=Products.pro, catalog_status="live").items`. The access token needs the matching read scope, such as `products:read`.
 
-Keep `catalog_status: "live"`. Without it the list also returns retired versions and a drafted one under the same external ID. `is_archived: false` does not drop them, because a retired version is not archived. `is_current` on a product is `true` only for the version on sale.
+Keep `catalog_status: "live"` when fetching by external ID. Without it the list also returns retired versions and a drafted one under the same external ID. `is_archived: false` does not drop them, because a retired version is not archived.
 
-Existing subscriptions stay on the version they bought, so old product IDs on them are expected. To check a customer's plan, compare `subscription.product.external_id`, not the product ID.
+- **Compare external IDs on what Polar returns.** Existing subscriptions, orders and benefit grants stay on the version the customer bought, so old Polar IDs on them are expected. To check a customer's plan, compare `subscription.product.external_id`, not the product ID. Customer state lists grants and meters by `benefit_id` and `meter_id` only, so never match those against an ID you stored; filter by `external_benefit_id` or `external_meter_id` as in the table instead.
+- **Custom fields.** `custom_field_data` is keyed by slug, which never changes, so read values by slug.
+- **Checkout links.** Prefer a checkout session per purchase. If the app uses a checkout link, keep only its URL: publish points existing links at the new version, but the product ID the link was created with goes stale. Creating a link takes product IDs only, so fetch the current one first, as above.
 
 ## Step 6: Review and release from CI
 
