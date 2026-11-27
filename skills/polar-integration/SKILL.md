@@ -20,7 +20,7 @@ If the project already uses `@polar-sh/sdk` below 1.0 (signs: `new Polar(...)`, 
 
 Don't install the deprecated `@polar-sh/<framework>` adapters (`@polar-sh/express`, `@polar-sh/hono`, `@polar-sh/fastify`, `@polar-sh/elysia`, `@polar-sh/astro`, `@polar-sh/sveltekit`, `@polar-sh/remix`, `@polar-sh/deno`, `@polar-sh/supabase`). `@polar-sh/nextjs`, `@polar-sh/nuxt`, `@polar-sh/tanstack-start` and `@polar-sh/better-auth` are maintained; keep them if the project already uses them.
 
-**First time with Polar?** Before you write code, ask the user whether they already have a Polar organization, want you to create one, or will create it themselves. Suggest starting in sandbox: checkout takes test cards there, so you can make a test purchase and check the whole flow end to end before real money is involved. To create the organization yourself, Polar supports the [auth.md](https://polar.sh/auth.md) spec: an agent can sign up on its own, without a human, set up the organization (products, benefits, meters, checkouts), and hand it over to the user later. Read <https://sandbox.polar.sh/auth.md> for sandbox or <https://polar.sh/auth.md> for production to learn how to sign up and get claimed. A user who creates it themselves starts at <https://sandbox.polar.sh/start> or <https://polar.sh/start>. When you start the claim, put the full `verification_uri` and the `user_code` in your reply to the user, copied exactly. Tool and command output is often collapsed or hidden, so the link only reaches the user if you write it in your message, and they can't claim the organization without it.
+**First time with Polar?** Before you write code, and unless they already told you in `setup-polar` or `polar-config`, ask the user whether they already have a Polar organization, want you to create one, or will create it themselves. Suggest starting in sandbox: checkout takes test cards there, so you can make a test purchase and check the whole flow end to end before real money is involved. To create the organization yourself, Polar supports the [auth.md](https://polar.sh/auth.md) spec: an agent can sign up on its own, without a human, set up the organization (products, benefits, meters, checkouts), and hand it over to the user later. Read <https://sandbox.polar.sh/auth.md> for sandbox or <https://polar.sh/auth.md> for production to learn how to sign up and get claimed. A user who creates it themselves starts at <https://sandbox.polar.sh/start> or <https://polar.sh/start>. When you start the claim, put the full `verification_uri` and the `user_code` in your reply to the user, copied exactly. Tool and command output is often collapsed or hidden, so the link only reaches the user if you write it in your message, and they can't claim the organization without it.
 
 Required environment variables (use whatever loader your framework provides — `process.env`, `Deno.env`, `import.meta.env`, etc.):
 
@@ -28,7 +28,7 @@ Required environment variables (use whatever loader your framework provides — 
 - `POLAR_WEBHOOK_SECRET` — only needed for the webhook recipe.
 - `POLAR_ENVIRONMENT` — `sandbox` while developing; omit it or set `production` in production. Sandbox and production are separate, so each needs its own token.
 
-The SDK is versioned by API version: the import path pins it. Use `2026-10`, the current version, unless the project already imports another one. Construct one client in a server-only module and reuse it:
+The SDK is versioned by API version: the import path pins it. Use `2026-10`, the current version, unless the project already imports another one or has a billing config (see "Projects with a billing config" in Recipe 1). Construct one client in a server-only module and reuse it:
 
 ```ts
 import { createPolar, type Environment } from "@polar-sh/sdk/2026-10";
@@ -144,6 +144,17 @@ export async function handleCheckout(request: Request): Promise<Response> {
 ```
 
 This handler accepts a GET request with `?products=<product_id>`. Drop fields you don't need and add fields from the table above (`metadata`, `embed_origin`, `locale`, ...) as needed.
+
+### Projects with a billing config
+
+Most organizations manage products in the dashboard. Their product IDs never change, and the handler above is right as it is.
+
+If the project has a `polar.config.ts` or `polar.config.json` (see the `polar-config` skill), the catalog is managed in that file instead, and publishing a change gives the changed product a new ID. A product ID kept in the app's code or env file then stops working: the checkout fails with "Product is no longer sold". Refer to products by their external ID from the config, which never changes:
+
+- Import the client from `@polar-sh/sdk/2027-01`, the first API version that takes external IDs.
+- Pass `external_products` in place of `products`: `polar.checkouts.create({ external_products: ["pro"], ... })`. The handler above then takes `?products=pro`.
+- Import `webhooks` from `@polar-sh/sdk/2027-01` as well in Recipe 3, and set the webhook endpoint to the same API version, so payloads match the client's types.
+- Sell through this endpoint, which creates a checkout session for each purchase, rather than through a checkout link created once.
 
 ### Framework variations
 
