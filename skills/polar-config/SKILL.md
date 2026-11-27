@@ -67,7 +67,7 @@ Three rules hold in both formats:
 
 - **The external ID is the identity.** It is the key in TypeScript and the `external_id` field in JSON, and it is how Polar matches an entry to an existing resource. Changing it removes the old resource and creates a new one, so never rename one. To change what customers see, change the name.
 - **External IDs** start with a letter or digit and contain only letters, digits, `.`, `_`, `:` and `-`. Prefer snake_case: it stays a valid name in generated code.
-- **A section you leave out is left alone. A products section you include is the whole catalog:** an entry missing from a section you include is left out of the next catalog version, and `"products": []` takes every product off sale. `validate` lists these as removed, "not in config". Nothing is deleted on Polar and customers keep what they have, but treat every removal `validate` reports as something the user must have asked for.
+- **A section you leave out is left alone. A products section you include is the whole catalog:** an entry missing from a section you include is left out of the next catalog version, and `"products": []` takes every product off sale. `validate` lists these as removed, "not in config". Nothing is deleted on Polar and customers keep what they have, but treat every removal `validate` reports as something the user must have asked for. The same holds inside `settings`: see Settings below.
 
 ### TypeScript
 
@@ -106,13 +106,20 @@ export default defineConfig({
 - **Meters** filter events with `eq`, `ne`, `gt`, `gte`, `lt`, `lte`, `like`, `notLike`, `and`, `or`, then aggregate with `.count()`, `.sum(property)`, `.avg(property)`, `.min(property)`, `.max(property)` or `.unique(property)`. `eq('name', 'api_call')` matches the event name. A config with an `events` section, which gives each event a schema, selects events with `.on(events.api_call)` instead; follow whichever the file already uses.
 - **Benefits** are `flag(name)`, a feature the app checks, or `credits(name).meter(key).units(n)`, usage included before a metered price charges. Add `.rollover()` to carry unused credits over.
 - **Products** take `.prices(...)`, then `.recurring('monthly')`, `.recurring('yearly')`, `.recurring(3, 'months')` or `.once()`, and optionally `.grants([...])`, `.trial(14, 'days')` and `.description(text)`.
-- **Prices** are `free()`, `fixed()`, `seats()`, `units()` and `meter(key)`. Tiered prices use `.graduated(...)` or `.volume(...)` with `tier()`.
+- **Prices** are `free()`, `fixed()`, `seats()`, `units()` and `meter(key)`. Tiered prices use `.graduated(...)` or `.volume(...)` with `tier()`. A product takes at most one fixed or free price, one seat-based or unit-based price, and one price per meter; anything else is a type error.
 
 The package is fully typed. For anything not shown here, read its type declarations in `node_modules` rather than guessing: a wrong helper is a type error, and a reference to a meter or benefit key that does not exist is one too.
 
 ### Settings
 
-`init` also writes a `settings` section with the organization's default currency and tax behavior: `settings: { payments: { currency: 'usd', tax: 'location' } }` in TypeScript, and the same object under `"settings"` in JSON. `tax` is `location`, `inclusive` or `exclusive`. It applies to the whole organization and takes effect on `publish`, so leave it as `init` wrote it unless the user asks for a change.
+`settings` holds what applies to the whole organization, in four groups: `payments` (the default `currency`, and `tax`, which is `location`, `inclusive` or `exclusive`), `subscriptions`, `customerPortal` and `customerNotifications`. Keys are camelCase in TypeScript (`subscriptions: { allowMultipleSubscriptions: true }`) and snake_case in JSON (`"subscriptions": { "allow_multiple_subscriptions": true }`). Settings take effect on `publish`.
+
+Two rules decide what a `settings` section does:
+
+- **A file with `settings` describes every setting.** One it leaves out goes back to its default, the value a new organization gets, and `validate` shows that reset as a change. A file with no `settings` section at all leaves the organization's settings alone.
+- **`init` and `reset` write only the settings that differ from their default**, and an empty `settings` when none do. So a short or empty section is correct. Never delete the section or a line in it to tidy up, and never add one the user did not ask for: both change the organization.
+
+Leave the section as `init` wrote it unless the user asks for a change. For the settings in each group, read the package's types in TypeScript; in JSON, `validate` names the keys a group accepts.
 
 ### JSON
 
@@ -199,6 +206,7 @@ polar config validate --json
 
 - `entries` lists each resource with an `action` of `created`, `updated`, `unchanged` or `removed`, and for a change the `diff` of each field, `before` and `after`.
 - `issues` lists problems with a `severity`, the `path` of the entry (`meters.tokens.name`), a `message` and the `location` in the file.
+- `draft` is there when the organization has an unpublished draft. Its `drift` lists the changes in the file that the draft does not have yet. Its `conflicts` lists changes the draft has that the file does not; Step 4 says what to do about those.
 
 Fix every issue with severity `error` in the file and validate again. Show warnings to the user. "No events with this name have been received yet" is expected until the app sends that event; check the event name for a typo, then move on.
 
@@ -218,14 +226,16 @@ polar config publish --confirm --json
 - `draft` saves meters, benefits, products and settings to the draft catalog, and nothing a customer sees changes yet.
 - `publish` makes the draft live: new checkouts sell it. Existing customers stay on the version they bought.
 
-Normally `draft` just updates the draft. It stops with a conflict when the draft on Polar contains changes that the local config file does not have, for example because a teammate drafted a change from their own copy of the file and has not committed it. Carrying on would throw their changes away. With `--json` the result has `"status": "conflict"` and a `conflicts` list naming each resource and whether the draft added, changed or removed it. Do not pick a way out on your own: show the user that list and ask which of these they want.
+Normally `draft` just updates the draft. It stops with a conflict when the draft on Polar contains changes that the local config file does not have, for example because a teammate drafted a change from their own copy of the file and has not committed it. Carrying on would throw their changes away. With `--json` the result has `"status": "conflict"` and a `conflicts` list. Each entry names the resource (`section` and `id`), has an `action` of `created`, `updated` or `removed` for what the draft did to it, and a `diff` with each field's value in the file (`before`) and in the draft (`after`). Do not pick a way out on your own: show the user that list and ask which of these they want.
 
 - `polar config draft --force` makes the draft on Polar match the local file and discards the other changes.
 - `polar config reset` rewrites the local config file to match what is on Polar: the draft when there is one, the live catalog otherwise. It replaces the whole file, so comments and anything that is not on Polar are lost. Without a terminal it needs `--confirm`, like the other commands that change something.
 
+`publish` needs the owner or admin role in the organization. "You don't have permission to publish the catalog" means the signed-in user can save a draft but not publish it: tell the user that an owner or admin has to.
+
 Between `draft` and `publish`, four things look wrong and are not:
 
-- `validate` still lists the drafted changes and still says to run `draft`. It compares the file with the live catalog, not with the draft. The next step is `publish`.
+- `validate` still lists the drafted changes, because it compares the file with the live catalog. It checks the draft as well: once the draft has them it says they are saved in a draft and that the next step is `publish`, and with `--json` its `draft.drift` is empty.
 - `draft` run again reports the same entries as created or updated.
 - A meter that is new in the draft does not count usage until `publish`. A customer's balance for it does not move while the catalog is only a draft, so publish before you test usage.
 - Each `publish` makes a new catalog version (`v1`, `v2`, ...). A product that changed gets a new ID on Polar and the old one stays for the customers who bought it, which is why application code uses external IDs (Step 5).
@@ -270,7 +280,7 @@ Events.api_call       # "api_call", from the meters' filters
 - Run it again after every change to the config, and commit the file. `polar config generate --check` writes nothing and fails when the file is missing or out of date; add it to CI, with the same `--out` if you used one.
 - Never edit the generated file.
 
-The API takes external IDs directly from version 2027-01, so the app never stores Polar's own IDs. In Python that is `from polar.v2027_01 import Polar`, then for example `external_products=[Products.pro]` when creating a checkout, `external_benefit_id=Benefits.priority_support` when listing a customer's benefit grants and `external_meter_id=Meters.api_calls` when reading a customer's meter. In TypeScript, import the client from `@polar-sh/sdk/2027-01` and pass `external_products: ["pro"]` to `polar.checkouts.create`.
+The API takes external IDs directly from version 2027-01, so the app never stores Polar's own IDs. In Python that is `from polar.v2027_01 import Polar`, then for example `external_products=[Products.pro]` when creating a checkout, `external_benefit_id=Benefits.priority_support` when listing a customer's benefit grants and `external_meter_id=Meters.api_calls` when reading a customer's meter. In TypeScript, import the client from `@polar-sh/sdk/2027-01` and pass `external_products: ["pro"]` to `polar.checkouts.create`. Changing a subscription's plan takes `external_product_id` the same way.
 
 Never put a Polar product ID in the app's code or env file. Each publish gives a changed product a new ID, and a checkout created with the old one fails with "Product is no longer sold".
 
