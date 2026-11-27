@@ -172,7 +172,7 @@ jobs:
             echo "::error::Claude changed files without writing DRIFT_SUMMARY.md"
             exit 1
           fi
-          unexpected=$(echo "$changed" | cut -c4- | grep -vE '^(skills/|README\.md$|CHANGELOG\.md$|\.claude-plugin/plugin\.json$|\.cursor-plugin/plugin\.json$|openai/plugin\.json$|gemini-extension\.json$)' || true)
+          unexpected=$(echo "$changed" | cut -c4- | grep -vE '^(skills/|README\.md$|CHANGELOG\.md$|plugin\.json$|\.claude-plugin/plugin\.json$|\.cursor-plugin/plugin\.json$|openai/plugin\.json$|gemini-extension\.json$)' || true)
           if [ -n "$unexpected" ]; then
             echo "::error::Claude changed files outside the skills: $unexpected"
             exit 1
