@@ -47,7 +47,7 @@ polar config init --sandbox --json
 If the CLI is not signed in, and the user has not already told you in `setup-polar`, ask which of these applies before going further:
 
 - **They have a Polar organization.** They run `polar auth login --sandbox`, which opens a browser.
-- **They want you to create one.** Polar supports the [auth.md](https://polar.sh/auth.md) spec: read <https://sandbox.polar.sh/auth.md> for sandbox or <https://polar.sh/auth.md> for production, sign up on your own, ask what to call the organization and create it with `POST /v1/organizations/` (a `name` and a `slug`). Then run the commands in this skill with your access token in place of a login: `POLAR_ACCESS_TOKEN=<access token> POLAR_ENVIRONMENT=sandbox polar config init --json`. Hand the organization over with a claim once the catalog is in place: ask the user for the email address they will sign in to Polar with, and put the full `verification_uri` and the `user_code` in your reply, copied exactly. Once the claim succeeds, use the access token it returns, because the one you had stops working.
+- **They want you to create one.** Polar supports the [auth.md](https://polar.sh/auth.md) spec: read <https://sandbox.polar.sh/auth.md> for sandbox or <https://polar.sh/auth.md> for production, sign up on your own, ask what to call the organization and create it with `POST /v1/organizations/` (a `name` and a `slug`). Then run this skill's commands with your access token: `POLAR_ACCESS_TOKEN=<access token> POLAR_ENVIRONMENT=sandbox polar config init --json`. Once the catalog is in place, hand the organization over with a claim: ask for the email address the user will sign in with, and put the full `verification_uri` and the `user_code` in your reply, copied exactly. After the claim, use the access token it returns; the old one stops working.
 - **They will create it themselves.** Send them to <https://sandbox.polar.sh/start>, then they run `polar auth login --sandbox`.
 
 `init` picks the format from the nearest project file: TypeScript with a `package.json`, JSON with a `pyproject.toml` or with neither. Pass `--format ts` or `--format json` when the project has both or the user wants the other one. For TypeScript it also installs the package the config imports.
@@ -112,14 +112,12 @@ The package is fully typed. For anything not shown here, read its type declarati
 
 ### Settings
 
-`settings` holds what applies to the whole organization, in four groups: `payments` (the default `currency`, and `tax`, which is `location`, `inclusive` or `exclusive`), `subscriptions`, `customerPortal` and `customerNotifications`. Keys are camelCase in TypeScript (`subscriptions: { allowMultipleSubscriptions: true }`) and snake_case in JSON (`"subscriptions": { "allow_multiple_subscriptions": true }`). Settings take effect on `publish`.
+`settings` holds what applies to the whole organization, in four groups: `payments` (the default `currency`, and `tax`: `location`, `inclusive` or `exclusive`), `subscriptions`, `customerPortal` and `customerNotifications`. Keys are camelCase in TypeScript (`allowMultipleSubscriptions`) and snake_case in JSON (`allow_multiple_subscriptions`). Settings take effect on `publish`.
 
-Two rules decide what a `settings` section does:
+- **A file with `settings` describes every setting.** One it leaves out goes back to its default, and `validate` shows that reset as a change. A file with no `settings` section leaves the organization's settings alone.
+- **`init` and `reset` write only the settings that differ from their default**, and an empty `settings` when none do. So a short or empty section is correct: never delete the section or a line in it to tidy up, and never add a setting the user did not ask for.
 
-- **A file with `settings` describes every setting.** One it leaves out goes back to its default, the value a new organization gets, and `validate` shows that reset as a change. A file with no `settings` section at all leaves the organization's settings alone.
-- **`init` and `reset` write only the settings that differ from their default**, and an empty `settings` when none do. So a short or empty section is correct. Never delete the section or a line in it to tidy up, and never add one the user did not ask for: both change the organization.
-
-Leave the section as `init` wrote it unless the user asks for a change. For the settings in each group, read the package's types in TypeScript; in JSON, `validate` names the keys a group accepts.
+For the settings in each group, read the package's types in TypeScript; in JSON, `validate` names the keys a group accepts.
 
 ### JSON
 
@@ -206,7 +204,7 @@ polar config validate --json
 
 - `entries` lists each resource with an `action` of `created`, `updated`, `unchanged` or `removed`, and for a change the `diff` of each field, `before` and `after`.
 - `issues` lists problems with a `severity`, the `path` of the entry (`meters.tokens.name`), a `message` and the `location` in the file.
-- `draft` is there when the organization has an unpublished draft. Its `drift` lists the changes in the file that the draft does not have yet. Its `conflicts` lists changes the draft has that the file does not; Step 4 says what to do about those.
+- `draft` is there when the organization has an unpublished draft: `drift` lists changes in the file that the draft lacks, `conflicts` lists changes the draft has that the file lacks (see Step 4).
 
 Fix every issue with severity `error` in the file and validate again. Show warnings to the user. "No events with this name have been received yet" is expected until the app sends that event; check the event name for a typo, then move on.
 
@@ -226,16 +224,16 @@ polar config publish --confirm --json
 - `draft` saves meters, benefits, products and settings to the draft catalog, and nothing a customer sees changes yet.
 - `publish` makes the draft live: new checkouts sell it. Existing customers stay on the version they bought.
 
-Normally `draft` just updates the draft. It stops with a conflict when the draft on Polar contains changes that the local config file does not have, for example because a teammate drafted a change from their own copy of the file and has not committed it. Carrying on would throw their changes away. With `--json` the result has `"status": "conflict"` and a `conflicts` list. Each entry names the resource (`section` and `id`), has an `action` of `created`, `updated` or `removed` for what the draft did to it, and a `diff` with each field's value in the file (`before`) and in the draft (`after`). Do not pick a way out on your own: show the user that list and ask which of these they want.
+Normally `draft` just updates the draft. It stops with a conflict when the draft on Polar contains changes that the local config file does not have, for example because a teammate drafted a change from their own copy of the file and has not committed it. Carrying on would throw their changes away. With `--json` the result has `"status": "conflict"` and a `conflicts` list: each entry has the resource's `section` and `id`, an `action` (`created`, `updated` or `removed`: what the draft did to it) and a `diff` from the file's value (`before`) to the draft's (`after`). Do not pick a way out on your own: show the user that list and ask which of these they want.
 
 - `polar config draft --force` makes the draft on Polar match the local file and discards the other changes.
 - `polar config reset` rewrites the local config file to match what is on Polar: the draft when there is one, the live catalog otherwise. It replaces the whole file, so comments and anything that is not on Polar are lost. Without a terminal it needs `--confirm`, like the other commands that change something.
 
-`publish` needs the owner or admin role in the organization. "You don't have permission to publish the catalog" means the signed-in user can save a draft but not publish it: tell the user that an owner or admin has to.
+`publish` needs the owner or admin role. "You don't have permission to publish the catalog" means the signed-in user can draft but not publish: tell them an owner or admin has to.
 
 Between `draft` and `publish`, four things look wrong and are not:
 
-- `validate` still lists the drafted changes, because it compares the file with the live catalog. It checks the draft as well: once the draft has them it says they are saved in a draft and that the next step is `publish`, and with `--json` its `draft.drift` is empty.
+- `validate` still lists the drafted changes, because it compares the file with the live catalog. Once the draft has them it says so and points to `publish`; with `--json`, `draft.drift` is empty.
 - `draft` run again reports the same entries as created or updated.
 - A meter that is new in the draft does not count usage until `publish`. A customer's balance for it does not move while the catalog is only a draft, so publish before you test usage.
 - Each `publish` makes a new catalog version (`v1`, `v2`, ...). A product that changed gets a new ID on Polar and the old one stays for the customers who bought it, which is why application code uses external IDs (Step 5).
@@ -260,7 +258,7 @@ Deprecate with `.deprecated()` in TypeScript and `"deprecated": true` in JSON. A
 
 Application code refers to the config by external ID: the product to sell, the benefit to check, the meter to read, the event to send. A typo in one of those strings fails silently at run time.
 
-With a TypeScript config the package types these for you. With a JSON config, generate them:
+With a JSON config, generate them:
 
 ```bash
 polar config generate
@@ -280,17 +278,18 @@ Events.api_call       # "api_call", from the meters' filters
 - Run it again after every change to the config, and commit the file. `polar config generate --check` writes nothing and fails when the file is missing or out of date; add it to CI, with the same `--out` if you used one.
 - Never edit the generated file.
 
-The API takes external IDs directly from version 2027-01, so the app never stores Polar's own IDs. In Python that is `from polar.v2027_01 import Polar`, then for example `external_products=[Products.pro]` when creating a checkout, `external_benefit_id=Benefits.priority_support` when listing a customer's benefit grants and `external_meter_id=Meters.api_calls` when reading a customer's meter. In TypeScript, import the client from `@polar-sh/sdk/2027-01` and pass `external_products: ["pro"]` to `polar.checkouts.create`. Changing a subscription's plan takes `external_product_id` the same way.
+The API takes external IDs directly from version 2027-01, so the app never stores Polar's own IDs. Import the client from `polar.v2027_01` in Python or `@polar-sh/sdk/2027-01` in TypeScript, and pass the generated names where you have them, such as `external_products=[Products.pro]`.
 
 ### Never store a Polar ID for something in the config
 
-Products, benefits, meters and custom fields are versioned. Publishing a change to one creates a new version with a new Polar ID and retires the old version. The external ID stays the same (for a custom field, its slug). A stored Polar ID goes stale at the next change: a checkout created with an old product ID fails with "Product is no longer sold", and an old benefit or meter ID no longer matches what new customers get.
+Products, benefits, meters and custom fields are versioned: publishing a change to one creates a new version with a new Polar ID, while the external ID stays the same (for a custom field, its slug). A stored Polar ID goes stale at the next change: a checkout created with an old product ID fails with "Product is no longer sold", and an old benefit or meter ID no longer matches what new customers get.
 
-Never put the Polar ID of a product, benefit or meter in the app's code, config or env file (no `POLAR_PRODUCT_ID`), and never paste in the new ID after a publish: the next change breaks it again. Name it by its external ID, and Polar resolves it to the version on sale:
+Never put the Polar ID of a product, benefit or meter in the app's code, config or env file (no `POLAR_PRODUCT_ID`), and never paste in the new ID after a publish. Name it by its external ID, and Polar resolves it to the version on sale:
 
 | The app wants to | Pass |
 | --- | --- |
 | Sell a product | `external_products` to `checkouts.create` |
+| Change a subscription's plan | `external_product_id` to `subscriptions.update` |
 | Check or grant a customer's benefit | `external_benefit_id` to `benefitGrants.list` or `benefitGrants.create` |
 | Read or credit a customer's meter | `external_meter_id` to `customerMeters.list` or `customerMeters.credits` |
 | Filter subscriptions, orders, checkouts or metrics by product | `external_product_id` |
@@ -306,11 +305,11 @@ const pro = items[0]; // the version on sale, or undefined when "pro" is not liv
 
 In Python: `polar.products.list(external_id=Products.pro, catalog_status="live").items`. The access token needs the matching read scope, such as `products:read`.
 
-Keep `catalog_status: "live"` when fetching by external ID. Without it the list also returns retired versions and a drafted one under the same external ID. `is_archived: false` does not drop them, because a retired version is not archived.
+Keep `catalog_status: "live"` when fetching by external ID: without it the list also returns retired versions and a drafted one, and `is_archived: false` does not drop them.
 
-- **Compare external IDs on what Polar returns.** Existing subscriptions, orders and benefit grants stay on the version the customer bought, so old Polar IDs on them are expected. To check a customer's plan, compare `subscription.product.external_id`, not the product ID. Customer state lists grants and meters by `benefit_id` and `meter_id` only, so never match those against an ID you stored; filter by `external_benefit_id` or `external_meter_id` as in the table instead.
+- **Compare external IDs on what Polar returns.** Subscriptions, orders and benefit grants stay on the version the customer bought, so old Polar IDs on them are expected. Check a customer's plan with `subscription.product.external_id`. Customer state lists grants and meters by `benefit_id` and `meter_id` only, so filter by `external_benefit_id` or `external_meter_id` instead of matching a stored ID.
 - **Custom fields.** `custom_field_data` is keyed by slug, which never changes, so read values by slug.
-- **Checkout links.** Prefer a checkout session per purchase. If the app uses a checkout link, keep only its URL: publish points existing links at the new version, but the product ID the link was created with goes stale. Creating a link takes product IDs only, so fetch the current one first, as above.
+- **Checkout links.** Prefer a checkout session per purchase. For a checkout link, keep only its URL: publish points existing links at the new version. Creating a link takes product IDs only, so fetch the current one first, as above.
 
 ## Step 6: Review and release from CI
 
