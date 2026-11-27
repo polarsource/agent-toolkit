@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.3.0
+
+- New `polar-config` skill: manages the catalog as code with a billing config file (`polar.config.ts` or `polar.config.json`) and the `polar config` commands of the Polar CLI. It writes and edits the file, validates it, saves it to a draft and publishes it.
+- New `polar-config-ci` skill: sets up CI for a billing config, so every pull request shows what it would change and a merge drafts or publishes it.
+- `setup-polar` asks whether the catalog is managed in the dashboard or in a config file, and hands off to `polar-config` for a config file.
+- `polar-integration` and `polar-testing` sell and test by external ID in projects with a billing config, using API version `2027-01`.
+
 ## 0.2.4
 
 - `setup-polar` and `polar-integration` now start a first-time setup by asking whether you have a Polar organization, want the agent to create one, or will create it yourself, and suggest starting in sandbox.
